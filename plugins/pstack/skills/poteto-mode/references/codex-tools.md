@@ -56,7 +56,7 @@ Skills name Claude defaults (a single-role default for code/prose/judgment, a wo
 
 ## Provider seats
 
-A panel, judge, or reviewer entry written `codex:<model>` runs as an ordinary `spawn_agent` child with that model and its level as `reasoning_effort`. Entries for other providers, such as `claude:` or `grok:`, run through the seat runner in [provider seats](provider-seats.md), never as a substituted Codex model. The runner needs network access and writes under the provider's home directory, which Codex's default sandbox blocks, so request escalated permissions for each runner command. Codex model rows live in `AGENTS.md`, so write seat entries there in the same `<provider>:<model>` form.
+An entry written `codex:<model>`, on any line that takes seats, runs as an ordinary `spawn_agent` child with that model and its level as `reasoning_effort`. Entries for other providers, such as `claude:` or `grok:`, run through the seat runner in [provider seats](provider-seats.md), never as a substituted Codex model. The runner needs network access and writes under the provider's home directory, which Codex's default sandbox blocks, so request escalated permissions for each runner command. Codex model rows live in `AGENTS.md`, so write seat entries there in the same `<provider>:<model>` form.
 
 ## Session routing hook
 
@@ -96,7 +96,7 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 | `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; substitute your configured Codex models for the runners and the cross-judge pool (see Model names above). A provider-prefixed entry is a provider seat, not a substituted model (see Provider seats above). |
 | `how` | The parallel explorers and the explainer map to `spawn_agent` fan-out; substitute your configured Codex models. |
 | `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. The transcript finder reads Claude Code's layout under `~/.claude/projects/`, so pass the session digest step 1 allows instead. |
-| `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |
+| `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). A provider-prefixed race arm is a provider seat, not a substituted model (see Provider seats above). |
 | `why` | The parallel investigators and the synthesizer map to `spawn_agent`; substitute your configured Codex models. List MCP servers from the tools Codex exposes to the session, not from `.mcp.json` or `claude mcp list`. |
 
 ## Vendored scripts

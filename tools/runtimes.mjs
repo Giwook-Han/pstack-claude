@@ -310,9 +310,8 @@ export function validatePiPackage(text, { pathExists }) {
 // The skills that dispatch on role models, which on Copilot need a model sheet.
 export const roleSkills = (models) => [...new Set(models.roles.map((r) => r.skill))].sort();
 
-// Copilot ships no default slugs: the models a Copilot account can reach vary
-// by plan and policy, so the user picks them in setup-pstack.
 export function copilotModelNamesSection(models) {
+  const optionalPanels = models.roles.filter((r) => r.tier === "panel" && r.optional).map((r) => code(r.role));
   return (
     "Skills name Claude Code model aliases in their Models sections. Those aliases are not Copilot model IDs, " +
     "and the Copilot build ships no default model IDs: the models an account can reach depend on its plan " +
@@ -342,7 +341,13 @@ export function copilotModelNamesSection(models) {
     "- Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial " +
     "signal comes from model diversity, so fill a panel from distinct vendors in the `task` tool's `model` " +
     "list (Claude, GPT, Gemini, Grok, and so on). pstack ships no default Copilot panel. If only one vendor is " +
-    "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n\n" +
+    "reachable, vary reasoning effort and note in the verdict that diversity was reduced.\n" +
+    (optionalPanels.length
+      ? `- Optional panel roles (${optionalPanels.join(", ")}): a sheet written before such a role existed has no ` +
+        "line for it, and the default in its skill's Models section names Claude aliases, not Copilot model IDs. " +
+        "Until `setup-pstack` writes the role's line, take its entries from the sheet's `arena runners` line.\n"
+      : "") +
+    "\n" +
     "`setup-pstack` lists the models from the `model` enum of the `task` tool and writes only IDs it saw there. " +
     "After it writes the sheet, it runs its `check-sheet.sh` script, which applies the hook's checks.\n\n" +
     "Run `setup-pstack`, and the parent session that orchestrates a panel, on a model at least as strong as " +

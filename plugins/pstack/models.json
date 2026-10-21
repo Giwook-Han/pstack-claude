@@ -15,6 +15,7 @@
     { "role": "hillclimb", "models": "default", "skill": "poteto-mode" },
     { "role": "judgment and prose", "models": "default", "skill": "poteto-mode" },
     { "role": "strongest judgment", "models": "strongest", "skill": "poteto-mode" },
+    { "role": "second opinions", "models": "panel", "skill": "poteto-mode", "seats": true, "optional": true },
     { "role": "how explorer", "models": "default", "skill": "how" },
     { "role": "how explainer", "models": "default", "skill": "how" },
     { "role": "why investigators", "models": "default", "skill": "why" },
@@ -24,6 +25,7 @@
     { "role": "arena runners", "models": "panel", "skill": "arena", "seats": true },
     { "role": "arena cross-judge pool", "models": "panel", "skill": "arena", "seats": true },
     { "role": "swarm workers", "models": "default", "skill": "swarm" },
+    { "role": "swarm race arms", "models": "panel", "skill": "swarm", "seats": true, "optional": true },
     { "role": "architect runners", "models": "panel", "skill": "architect", "seats": true },
     { "role": "interrogate reviewers", "models": "panel", "skill": "interrogate", "seats": true },
     { "role": "thermos reviewers", "models": "inherit-parent", "skill": "thermos", "seats": true, "optional": true }

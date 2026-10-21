@@ -69,8 +69,16 @@ describe("check-sheet.sh", () => {
     expect(check(sheet({ "architect runners": seats, "thermos reviewers": "grok:grok-4.7 @xhigh, claude:opus @max" }))).toEqual(ok);
   });
 
+  test("passes seats on the second opinions and swarm race arms lines", () => {
+    const seats = "grok:grok-4.7 @xhigh, codex:gpt-6-astra @ultra, claude:opus @max";
+    expect(check(sheet({ "second opinions": seats, "swarm race arms": seats }))).toEqual(ok);
+  });
+
   test("rejects a seat on a line that does not take one", () =>
     expect(check(sheet({ [roles[0]]: "grok:grok-4.7" }))).toEqual(invalid(`\`${roles[0]}\` cannot take a provider seat`)));
+
+  test("rejects a seat on swarm workers, so a slice worker never runs as one", () =>
+    expect(check(sheet({ "swarm workers": "grok:grok-4.7 @xhigh" }))).toEqual(invalid("`swarm workers` cannot take a provider seat")));
 
   test("names a seat level its provider does not list", () => {
     const levelProblem = invalid("`interrogate reviewers` has a seat level its provider does not list");
@@ -91,8 +99,13 @@ describe("check-sheet.sh", () => {
     expect(check(sheet(oneProvider, ["panel vendors: any"]))).toEqual(ok);
   });
 
-  test("passes a sheet written before the optional thermos reviewers role", () =>
-    expect(check(sheet({ "thermos reviewers": null }))).toEqual(ok));
+  const optional = models.roles.filter((r) => r.optional).map((r) => r.role);
+  for (const role of optional) {
+    test(`passes a sheet written before the optional ${role} role`, () => expect(check(sheet({ [role]: null }))).toEqual(ok));
+  }
+
+  test("passes a sheet written before any optional role", () =>
+    expect(check(sheet(Object.fromEntries(optional.map((role) => [role, null]))))).toEqual(ok));
 
   test("keeps seats out of the saved model list the Copilot task check enforces", () => {
     writeFileSync(sheetPath, sheet({ "interrogate reviewers": "grok:grok-4.7 @xhigh, claude-opus-5" }));

@@ -771,9 +771,10 @@ export function providerSeatsSection(models, link) {
     "An entry for the runtime you are on, `claude:` on Claude Code or `codex:` on Codex, is an ordinary subagent with that model and level. " +
     "Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, and read its answer file when it finishes. " +
     "The `Agent` rules in this skill, including any fallback for a rejected entry, apply only to entries without a prefix. " +
-    "A seat cannot edit files, load skills, or reach this session's MCP tools, so its prompt file carries everything a subagent would get, with every skill or reference the prompt names pasted in, and it returns text: a design, a review, or a verdict. " +
+    "A seat cannot load skills or reach this session's MCP tools, so its prompt file carries everything a subagent would get, with every skill or reference the prompt names pasted in. " +
+    "It returns text, such as a design, a review, or a verdict. Only `arena` and `swarm` let a seat edit files, in write mode inside its own clean git worktree. " +
     "A seat's provider counts as a model family different from the parent's when the parent runs on another provider. " +
-    "A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model."
+    "A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model or hand its work to a subagent."
   );
 }
 

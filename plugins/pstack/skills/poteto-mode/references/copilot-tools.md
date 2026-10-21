@@ -48,6 +48,7 @@ Skills name Claude Code model aliases in their Models sections. Those aliases ar
 - Roles that default to the worker model (`feature, refactoring`): the worker model the user chose.
 - Roles that default to the strongest model (`strongest judgment`): the strongest model the user chose.
 - Diverse-model panels (`arena`, `architect`, `interrogate`, `how` critics, `reflect`): the adversarial signal comes from model diversity, so fill a panel from distinct vendors in the `task` tool's `model` list (Claude, GPT, Gemini, Grok, and so on). pstack ships no default Copilot panel. If only one vendor is reachable, vary reasoning effort and note in the verdict that diversity was reduced.
+- Optional panel roles (`second opinions`, `swarm race arms`): a sheet written before such a role existed has no line for it, and the default in its skill's Models section names Claude aliases, not Copilot model IDs. Until `setup-pstack` writes the role's line, take its entries from the sheet's `arena runners` line.
 
 `setup-pstack` lists the models from the `model` enum of the `task` tool and writes only IDs it saw there. After it writes the sheet, it runs its `check-sheet.sh` script, which applies the hook's checks.
 

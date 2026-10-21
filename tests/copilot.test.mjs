@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadLeadLines, loadModels, noteSkills } from "../tools/generate.mjs";
-import { RUNTIMES } from "../tools/runtimes.mjs";
+import { copilotModelNamesSection, RUNTIMES } from "../tools/runtimes.mjs";
 import { markdownFiles } from "../tools/validate-skills.mjs";
 import { mappingCoverage } from "./mapping-coverage.mjs";
 
@@ -66,6 +66,22 @@ describe("copilot-tools.md", () => {
     for (const s of ["create_session", "save_session_automation", "`orchestrate`", "`pr-stack`", "`git worktree add`", "`/fleet`"]) {
       expect(mapping).toContain(s);
     }
+  });
+});
+
+describe("copilot-tools.md Model names", () => {
+  const optionalPanels = models.roles.filter((r) => r.tier === "panel" && r.optional).map((r) => `\`${r.role}\``);
+
+  test("points every optional panel role at one required panel role's line, and says nothing when no role is optional", () => {
+    expect(optionalPanels.length).toBeGreaterThan(0);
+    const bullet = copilotModelNamesSection(models)
+      .split("\n")
+      .find((line) => line.includes(optionalPanels[0]));
+    for (const role of optionalPanels) expect(bullet).toContain(role);
+    const named = [...bullet.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+    expect(models.roles.filter((r) => r.tier === "panel" && !r.optional && named.includes(r.role))).toHaveLength(1);
+    const none = copilotModelNamesSection({ ...models, roles: models.roles.map((r) => ({ ...r, optional: false })) });
+    for (const role of optionalPanels) expect(none).not.toContain(role);
   });
 });
 

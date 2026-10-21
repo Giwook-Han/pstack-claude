@@ -20,6 +20,7 @@ function sheet_roles(roles, panel,    n) {
   roles[++n] = "hillclimb"
   roles[++n] = "judgment and prose"
   roles[++n] = "strongest judgment"
+  roles[++n] = "second opinions"
   roles[++n] = "how explorer"
   roles[++n] = "how explainer"
   roles[++n] = "why investigators"
@@ -29,11 +30,14 @@ function sheet_roles(roles, panel,    n) {
   roles[++n] = "arena runners"
   roles[++n] = "arena cross-judge pool"
   roles[++n] = "swarm workers"
+  roles[++n] = "swarm race arms"
   roles[++n] = "architect runners"
   roles[++n] = "interrogate reviewers"
   roles[++n] = "thermos reviewers"
+  panel["second opinions"] = 1
   panel["arena runners"] = 1
   panel["arena cross-judge pool"] = 1
+  panel["swarm race arms"] = 1
   panel["architect runners"] = 1
   panel["interrogate reviewers"] = 1
   SHEET_EFFORT["low"] = 1
@@ -63,11 +67,15 @@ function sheet_roles(roles, panel,    n) {
   SHEET_PROVIDER_EFFORT["grok", "high"] = 1
   SHEET_PROVIDER_EFFORT["grok", "xhigh"] = 1
   SHEET_PROVIDER_EFFORT["grok", "max"] = 1
+  SHEET_SEAT_ROLE["second opinions"] = 1
   SHEET_SEAT_ROLE["arena runners"] = 1
   SHEET_SEAT_ROLE["arena cross-judge pool"] = 1
+  SHEET_SEAT_ROLE["swarm race arms"] = 1
   SHEET_SEAT_ROLE["architect runners"] = 1
   SHEET_SEAT_ROLE["interrogate reviewers"] = 1
   SHEET_SEAT_ROLE["thermos reviewers"] = 1
+  SHEET_OPTIONAL["second opinions"] = 1
+  SHEET_OPTIONAL["swarm race arms"] = 1
   SHEET_OPTIONAL["thermos reviewers"] = 1
   return n
 }

@@ -33,7 +33,7 @@ The Codex home directory is `$CODEX_HOME` when that variable is set and `~/.code
 
 Enumerate the model names the `Agent` tool's `model` parameter accepts in this session. That is the dependable source. On Claude Code they are the family names listed in [Models](#models) below, each running that family's current model, and a full model ID is rejected. The default panel is listed there too. The panel is chosen for cross-family diversity. Ask the user to confirm or paste any additional slugs they want available. Never write a real slug you have not confirmed is available. The aliases `inherit-parent` and `auto` are always valid even though they are not detected slugs. Both mean the role runs on the parent session's model, which the `Agent` call expresses by omitting `model`.
 
-Panel, judge, and reviewer lines may also name provider seats, `<provider>:<model>` entries that run on another provider's CLI per [provider seats](../poteto-mode/references/provider-seats.md). Confirm a seat's slug through its provider rather than the `Agent` tool: `grok models` lists Grok's, and the user confirms the Codex or Claude slugs their plan reaches. Check that each provider's CLI is signed in before writing its seats.
+Each role line that [Models](#models) lists as taking seats may also name provider seats, `<provider>:<model>` entries that run on another provider's CLI per [provider seats](../poteto-mode/references/provider-seats.md). Confirm a seat's slug through its provider rather than the `Agent` tool: `grok models` lists Grok's, and the user confirms the Codex or Claude slugs their plan reaches. Check that each provider's CLI is signed in before writing its seats.
 
 ### 2. Load current state
 
@@ -41,7 +41,7 @@ The default role-to-model mapping is the rule shape shown in the Write the overr
 
 ### 3. Map and confirm
 
-Show every role with its current model, marking any real slug not in the detected set as needing a choice. Also list each line step 2 dropped or rewrote. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` as the options. Prefer `AskUserQuestion` over free text. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. `arena cross-judge pool` is also a list, but Arena selects one value from it whose model family differs from the parent's when possible. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm.
+Show every role with its current model, marking any real slug not in the detected set as needing a choice. Also list each line step 2 dropped or rewrote. Ask whether to accept as-is or change specific roles, offering the detected models plus `inherit-parent` and `auto` as the options. Prefer `AskUserQuestion` over free text. For panel roles (arena runners, architect runners, interrogate reviewers) the value is a list, and one subagent runs per entry, alias entries included, so the list length sets the count. `arena cross-judge pool` is also a list, but Arena selects one value from it whose model family differs from the parent's when possible. `second opinions` is a list too, and a second opinion takes its first entry whose model family differs from the first answer's. `swarm race arms` gives a swarm model race one arm per entry. `swarm workers` is the default model for every worker unless a race or comparison assigns another model per arm.
 
 Then ask for the default reasoning effort, the `default effort` line. It is `session`, which keeps the parent session's effort, or one of the levels in [Models](#models). Start from the default listed there. Every role value without a suffix runs at it. Then ask whether any role should run at another level. On Claude Code a role value may carry one after its slug, as in `<slug> @xhigh`; panel entries take their own, as in `<slug> @xhigh, <slug> @max`. Each level is passed as the dispatch's effort, so the choice holds without changing the session. Leave the suffix off for the default effort.
 
@@ -60,7 +60,7 @@ Write the current runtime's sheet with the shape below. Overwrite the whole file
 ```markdown
 # pstack model configuration
 
-Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. A model may carry a reasoning effort, as in `opus @xhigh` (levels: low, medium, high, xhigh, max); the role's subagent then runs at that level, each entry of a panel list on its own. `default effort` sets the level for a value without one; `session` keeps the parent session's effort. An entry written `<provider>:<model>`, as in `grok:<model> @xhigh`, is a provider seat that runs on that provider's own CLI (providers: claude, codex, grok; each takes its own levels). Only these lines take seats: arena runners; arena cross-judge pool; architect runners; interrogate reviewers; thermos reviewers. `panel vendors: any` lets a panel name models from one vendor. `session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; any other value, or no line, leaves it on.
+Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. A model may carry a reasoning effort, as in `opus @xhigh` (levels: low, medium, high, xhigh, max); the role's subagent then runs at that level, each entry of a panel list on its own. `default effort` sets the level for a value without one; `session` keeps the parent session's effort. An entry written `<provider>:<model>`, as in `grok:<model> @xhigh`, is a provider seat that runs on that provider's own CLI (providers: claude, codex, grok; each takes its own levels). Only these lines take seats: second opinions; arena runners; arena cross-judge pool; swarm race arms; architect runners; interrogate reviewers; thermos reviewers. `panel vendors: any` lets a panel name models from one vendor. `session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; any other value, or no line, leaves it on.
 
 feature, refactoring: sonnet
 bug-fix: opus
@@ -68,6 +68,7 @@ perf-issue: opus
 hillclimb: opus
 judgment and prose: opus
 strongest judgment: fable
+second opinions: opus, fable, sonnet, haiku
 how explorer: opus
 how explainer: opus
 why investigators: opus
@@ -77,6 +78,7 @@ reflect judgment, divergent, synthesizer: opus
 arena runners: opus, fable, sonnet, haiku
 arena cross-judge pool: opus, fable, sonnet, haiku
 swarm workers: opus
+swarm race arms: opus, fable, sonnet, haiku
 architect runners: opus, fable, sonnet, haiku
 interrogate reviewers: opus, fable, sonnet, haiku
 thermos reviewers: inherit-parent
@@ -130,4 +132,4 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 - Default reasoning effort: `session`
 - Single-role default: `opus`
 - Provider seat levels: `claude` (low, medium, high, xhigh, max), `codex` (minimal, low, medium, high, xhigh, max, ultra), `grok` (none, minimal, low, medium, high, xhigh, max)
-- Roles that take provider seats: `arena runners`, `arena cross-judge pool`, `architect runners`, `interrogate reviewers`, `thermos reviewers`
+- Roles that take provider seats: `second opinions`, `arena runners`, `arena cross-judge pool`, `swarm race arms`, `architect runners`, `interrogate reviewers`, `thermos reviewers`
