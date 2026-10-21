@@ -2,6 +2,14 @@
 
 This file is the release changelog, with one `## <version> - <title>` entry per release, newest first. The Cursor-to-Claude rewrite rules live in [`tools/substitutions.json`](tools/substitutions.json), and the [sync boundary](CONTRIBUTING.md#the-sync-boundary) in `CONTRIBUTING.md` defines how a change to upstream's skill content is declared.
 
+## 0.9.99 - Codex subagents need no setting
+
+The Codex mapping and the docs reference told every Codex user to add `[features] multi_agent = true` and said that `spawn_agent` is missing without it. codex-cli 0.115.0 made `multi_agent` a stable feature that is on by default, so current releases need no setting. On codex-cli 0.163.0, a model's `multi_agent_version` in Codex's model catalog decides before `multi_agent` does. A model that has one keeps its subagent tools even with `multi_agent = false`, and `[agents] enabled = false` is the setting that removes them.
+
+The mapping now says so, tells users of releases before 0.115.0 to upgrade, and keeps the `multi_agent = true` snippet only for 0.102.0 through 0.114.0, where the feature is experimental and off by default. Its sequential fallback and its blocked independent review now apply to any session without `spawn_agent`. Its tool table says that some Codex sessions, not hosts, lack `close_agent`, because on 0.163.0 only a model on the first version of the multi-agent tools gets it. The docs reference drops the snippet, says that an existing `multi_agent = true` line is safe to keep, and names the two settings to check when the fan-out skills run one sequential pass. An independent review of the draft by Claude Opus found that it stated the 0.163.0 behavior for every model, though only `gpt-6-luna` ran, and that it gave no advice for releases before 0.102.0. This release fixes both.
+
+**Verified.** On codex-cli 0.163.0 with `gpt-6-luna` at low, each configuration ran in its own throwaway `CODEX_HOME`. The interactive TUI and `codex exec` both started a subagent that replied, with no `multi_agent` line, with `multi_agent = true`, and with `multi_agent = false`. `codex exec` did the same with `--disable multi_agent`. Neither surface had `spawn_agent` with `[agents] enabled = false`. The precedence, the catalog entries, and the version history come from Codex's source, read at tags from `rust-v0.101.0` to `rust-v0.163.0`. On the release head: `bun test tests/` (1365 pass, 40 skip, 0 fail), `bun tools/generate.mjs --check`, markdownlint-cli2, `lychee --offline`, and the fork-registry dry-run sync for pstack, cursor-team-kit, and thermos at their pins.
+
 ## 0.9.98 - Seats for second opinions, swarm races, and code
 
 0.9.97 let panels, judges, and reviewers mix providers through provider seats. A second opinion, a cross-family verifier, a swarm model race, and a code-writing arena candidate still ran only on the runtime's own models, though each gains the most from a different provider. All four can now run as seats.

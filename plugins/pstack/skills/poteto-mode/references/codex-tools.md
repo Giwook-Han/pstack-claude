@@ -16,20 +16,22 @@ pstack skills are written in Claude Code tool language (the `Skill` tool, the `A
 | Dispatch a subagent (the `Agent`/`Task` tool) | `spawn_agent` |
 | Dispatch N parallel subagents in one turn | N `spawn_agent` calls in one response |
 | Wait for a subagent result | `wait_agent` |
-| Free a finished subagent slot | `close_agent`, when the session exposes it. Some Codex hosts don't. |
+| Free a finished subagent slot | `close_agent`, when the session exposes it. Some Codex sessions don't. |
 | Track tasks (the todolist; `TaskCreate` / `TaskUpdate`, or `TodoWrite` on Claude Code) | `update_plan` |
 | Ask the human a fixed-choice question (`AskUserQuestion`) | Ask in plain text and let the user answer. Codex has no structured-choice tool. |
 
-Subagent dispatch needs `multi_agent` enabled. Add to `~/.codex/config.toml`:
+In codex-cli 0.115.0 and later, `multi_agent` is a stable feature that is on by default, so subagent dispatch needs no configuration. On codex-cli 0.163.0, a model's `multi_agent_version` in Codex's model catalog decides before `multi_agent` does. A model that has one, such as `gpt-6-luna`, keeps `spawn_agent` in the interactive TUI and in `codex exec` even with `multi_agent = false`. For a model without one, `multi_agent` still decides. In that release, `[agents] enabled = false` in `~/.codex/config.toml` removes the subagent tools.
+
+Releases before codex-cli 0.115.0 keep subagents off by default, so upgrade Codex. On 0.102.0 through 0.114.0, you can instead add this to `~/.codex/config.toml`:
 
 ```toml
 [features]
 multi_agent = true
 ```
 
-Without it, `spawn_agent` is unavailable and the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass. A required independent review does not degrade. It stays blocked, as poteto-mode's [Subagents](../SKILL.md#subagents) section says.
+When the session has no `spawn_agent`, the fan-out skills (`interrogate`, `why`, `how`, `arena`, `reflect`) degrade to a single sequential pass. A required independent review does not degrade. It stays blocked, as poteto-mode's [Subagents](../SKILL.md#subagents) section says.
 
-Enabling `multi_agent` does not lift the host's thread limit. A thread-limit error from `spawn_agent` is a capacity error, not a rejected model slug, so the skills' fallback to another model does not apply. After the first capacity rejection, stop spawning. Close a finished agent with `close_agent` before you try again, and where the session has no `close_agent`, do not assume a finished agent's slot is free.
+The host limits how many agent threads run at once. A thread-limit error from `spawn_agent` is a capacity error, not a rejected model slug, so the skills' fallback to another model does not apply. After the first capacity rejection, stop spawning. Close a finished agent with `close_agent` before you try again, and where the session has no `close_agent`, do not assume a finished agent's slot is free.
 
 ## Subagent policy
 

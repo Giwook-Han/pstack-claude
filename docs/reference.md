@@ -113,14 +113,7 @@ The [README installation](../README.md#codex) registers that catalog with `codex
 
 OpenAI documents [marketplace registration and the plugin format](https://developers.openai.com/plugins/build/plugins#add-a-marketplace-from-the-cli). If your CLI lacks `plugin add`, use the plugin browser after registering the marketplace, or use the [skills-only installation](#shared-skills-installation).
 
-Request `poteto-mode` by name or select its entry, such as `pstack:poteto-mode`. To enable parallel subagents:
-
-```toml
-[features]
-multi_agent = true
-```
-
-Add this setting to `~/.codex/config.toml` if subagents are disabled. Skills such as `arena`, `interrogate`, and `architect` use parallel agents. The [mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) describes a sequential fallback and translates Claude tool names, model defaults, and verification instructions.
+Request `poteto-mode` by name or select its entry, such as `pstack:poteto-mode`. Skills such as `arena`, `interrogate`, and `architect` use parallel subagents, which Codex starts with `spawn_agent`. In codex-cli 0.115.0 and later, subagents are on by default, so they need no setting in `~/.codex/config.toml`. An existing `multi_agent = true` line matches the default and is safe to keep. Releases before 0.115.0 keep subagents off by default, so upgrade Codex. On 0.102.0 through 0.114.0, you can instead add `multi_agent = true` under `[features]` in `~/.codex/config.toml`. If the fan-out skills run one sequential pass, look in `~/.codex/config.toml` for `multi_agent = false` or `[agents] enabled = false`. The [mapping](../plugins/pstack/skills/poteto-mode/references/codex-tools.md) describes the sequential fallback when `spawn_agent` is missing and what codex-cli 0.163.0 does in the interactive TUI and in `codex exec`. It also translates Claude tool names, model defaults, and verification instructions.
 
 For optional slash-command shortcuts, run this from the clone's root:
 
