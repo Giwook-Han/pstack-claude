@@ -60,7 +60,7 @@ Write the current runtime's sheet with the shape below. Overwrite the whole file
 ```markdown
 # pstack model configuration
 
-Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. A model may carry a reasoning effort, as in `opus @xhigh` (levels: low, medium, high, xhigh, max); the role's subagent then runs at that level, each entry of a panel list on its own. `default effort` sets the level for a value without one; `session` keeps the parent session's effort. An entry written `<provider>:<model>`, as in `grok:<model> @xhigh`, is a provider seat that runs on that provider's own CLI (providers: claude, codex, grok; each takes its own levels). Use seats on panel, judge, and reviewer lines. `panel vendors: any` lets a panel name models from one vendor, where a provider counts as a vendor. `session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; any other value, or no line, leaves it on.
+Per-role model overrides for pstack skills. Each pstack SKILL.md names its defaults in a Models section; the values here override those defaults. Delete a line to fall back to the skill default. A value of `inherit-parent` or `auto` runs that role on the parent session's model (the `Agent` call omits `model`); an alias entry in a panel list still counts toward that panel's fan-out. A model may carry a reasoning effort, as in `opus @xhigh` (levels: low, medium, high, xhigh, max); the role's subagent then runs at that level, each entry of a panel list on its own. `default effort` sets the level for a value without one; `session` keeps the parent session's effort. An entry written `<provider>:<model>`, as in `grok:<model> @xhigh`, is a provider seat that runs on that provider's own CLI (providers: claude, codex, grok; each takes its own levels). Only these lines take seats: arena runners; arena cross-judge pool; architect runners; interrogate reviewers; thermos reviewers. `panel vendors: any` lets a panel name models from one vendor. `session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; any other value, or no line, leaves it on.
 
 feature, refactoring: sonnet
 bug-fix: opus
@@ -79,7 +79,7 @@ arena cross-judge pool: opus, fable, sonnet, haiku
 swarm workers: opus
 architect runners: opus, fable, sonnet, haiku
 interrogate reviewers: opus, fable, sonnet, haiku
-thermos reviewers: opus
+thermos reviewers: inherit-parent
 
 default effort: session
 session hook: on
@@ -130,3 +130,4 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 - Default reasoning effort: `session`
 - Single-role default: `opus`
 - Provider seat levels: `claude` (low, medium, high, xhigh, max), `codex` (minimal, low, medium, high, xhigh, max, ultra), `grok` (none, minimal, low, medium, high, xhigh, max)
+- Roles that take provider seats: `arena runners`, `arena cross-judge pool`, `architect runners`, `interrogate reviewers`, `thermos reviewers`

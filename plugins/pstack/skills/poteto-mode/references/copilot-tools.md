@@ -104,6 +104,10 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow the Agent Skills conventions: a `SKILL.md` with `name` + `description` frontmatter, progressive disclosure into `references/`, and poteto-mode's [authoring-a-skill playbook](../playbooks/authoring-a-skill.md). |
 | `loop` (recurring/self-paced re-invocation, used by `babysit`) | Copilot has no `loop` skill. In the app use `save_session_automation`; on the CLI re-run the step yourself on a cadence. |
 
+## Provider seats
+
+An entry written `<provider>:<model>` is a provider seat, not a `task` model: run it through the seat runner in [provider seats](provider-seats.md). No provider is native to Copilot, so every seat runs through the runner, and the plugin hook leaves seats out of the saved model choices, so a `task` call naming one is denied. The per-skill notes below cover entries without a prefix.
+
 ## Per-skill notes
 
 Affected skill entry points point here. Most skills need only the tables above. These need one more mapping:
@@ -116,7 +120,7 @@ Affected skill entry points point here. Most skills need only the tables above. 
 | `how` | The explorers and the explainer are `task` calls with the sheet's `how` role models; critics use a read-only agent type (see Subagent policy). |
 | `arena` | Runners and the cross-judge pool come from the sheet's panel lines; pick the cross-judge from a different vendor than the candidate it grades. |
 | `no-comments` | Dispatch `task` with `agent_type: "pstack:comment-sicko"`. |
-| `thermos` | Dispatch two `task` calls with `mode: "background"`, `agent_type: "pstack:thermo-nuclear-review-subagent"` and `agent_type: "pstack:thermo-nuclear-code-quality-review-subagent"`, each with the same diff and file contents in its prompt. |
+| `thermos` | Dispatch two `task` calls with `mode: "background"`, `agent_type: "pstack:thermo-nuclear-review-subagent"` and `agent_type: "pstack:thermo-nuclear-code-quality-review-subagent"`, each with the same diff and file contents in its prompt. Run the pair once per `thermos reviewers` entry. |
 | `swarm` | Workers are `task` calls with `mode: "background"`, each on its own worktree; in the app, `create_session` per worker. |
 | `teach` | Running `how` and `why` in parallel maps to `task` fan-out; image generation uses whatever image tool you have, or skip it and say so. |
 | `why` | Available MCP servers appear in your tool list; there is no `mcp__` prefix convention to scan for. |

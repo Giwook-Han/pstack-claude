@@ -367,10 +367,11 @@ export const lineStartingWith = (prefix) => (lines) => {
 
 const blankPadded = (body) => ["", ...body.split("\n"), ""];
 
-// Skills whose panel, judge, or reviewer roles take provider seats, and the
-// reference their stamped section links to (relative to the skills tree).
-export const PROVIDER_SEAT_SKILLS = ["arena", "architect", "interrogate", "thermos"];
+// The provider seats reference (relative to the skills tree), the line in it
+// that lists the seat roles, and the runner whose level table is stamped.
 const SEATS_DOC = "poteto-mode/references/provider-seats.md";
+const SEAT_ROLES_LINE = "Roles that take seats:";
+const SEAT_RUNNER = "poteto-mode/scripts/seat.mjs";
 
 const SHEET_ROLES_OPEN = "  # Stamped from plugins/pstack/models.json; edit there and rerun tools/generate.mjs.";
 const ROLE_SKILLS_LINE = "Skills that dispatch on role models:";
@@ -390,8 +391,14 @@ function sheetRoles(models) {
       `  SHEET_PROVIDER[${quote(provider)}] = 1`,
       ...levels.map((level) => `  SHEET_PROVIDER_EFFORT[${quote(provider)}, ${quote(level)}] = 1`),
     ]),
+    ...seatRoles(models).map((role) => `  SHEET_SEAT_ROLE[${quote(role)}] = 1`),
+    ...models.roles.filter((r) => r.optional).map((r) => `  SHEET_OPTIONAL[${quote(r.role)}] = 1`),
   ];
 }
+
+// The roles whose lines take provider seats, and the skills that own them.
+export const seatRoles = (models) => models.roles.filter((r) => r.seats).map((r) => r.role);
+const seatSkills = (models) => [...new Set(models.roles.filter((r) => r.seats).map((r) => r.skill))];
 
 function requiredRole(models, label) {
   const role = models.roles.find((r) => r.role === label);
@@ -433,7 +440,7 @@ export function regions(models) {
       appendHeading: "## Reasoning effort",
       render: () => blankPadded(effortSection(models.efforts, models.defaultEffort)),
     })),
-    ...PROVIDER_SEAT_SKILLS.map((skill) => ({
+    ...seatSkills(models).map((skill) => ({
       file: skillFile(skill),
       name: "Provider seats section",
       locate: section("Provider seats"),
@@ -445,6 +452,18 @@ export function regions(models) {
       name: "provider levels",
       locate: section("Levels"),
       render: () => blankPadded(providerLevelsSection(models)),
+    },
+    {
+      file: `${PLUGIN}/skills/${SEATS_DOC}`,
+      name: "seat roles",
+      locate: lineStartingWith(SEAT_ROLES_LINE),
+      render: () => [`${SEAT_ROLES_LINE} ${andList(seatRoles(models).map(code))}.`],
+    },
+    {
+      file: `${PLUGIN}/skills/${SEAT_RUNNER}`,
+      name: "provider levels",
+      locate: between("export const PROVIDERS = {", "};"),
+      render: () => Object.entries(models.providers).map(([provider, levels]) => `  ${provider}: ${JSON.stringify(levels).replaceAll(",", ", ")},`),
     },
     {
       file: skillFile("setup-pstack"),
@@ -480,6 +499,7 @@ export function regions(models) {
           ["Strongest", "strongest"],
           ["Worker", "worker"],
           ["Panel", "panel"],
+          ["Parent", "parent"],
         ].map(([label, tier]) => `| ${label} | ${models.roles.filter((r) => r.tier === tier).map((r) => code(r.role)).join(", ")} |`),
     },
     {
@@ -564,12 +584,20 @@ export function applyRegions(file, text, models, { strict = true } = {}) {
 // A role's "models" names a tier (default, strongest, worker, panel) or lists slugs.
 // A tier resolves to its models and stays on the role as `tier`, so moving a
 // tier is one edit and the Codex mapping can follow the same keys.
+// A role whose models are "inherit-parent" runs on the parent session's model,
+// under the "parent" pseudo-tier that no tier question asks about. Provider seats on the runtime's own provider (claude) take
+// the runtime's effort levels.
 export function resolveModels(models) {
   return {
     ...models,
     roles: models.roles.map((r) =>
-      typeof r.models === "string" ? { ...r, tier: r.models, models: [models.tiers[r.models]].flat() } : r,
+      r.models === "inherit-parent"
+        ? { ...r, tier: "parent", models: ["inherit-parent"] }
+        : typeof r.models === "string"
+          ? { ...r, tier: r.models, models: [models.tiers[r.models]].flat() }
+          : r,
     ),
+    providers: { claude: [...models.efforts], ...models.providers },
   };
 }
 
@@ -614,6 +642,10 @@ export function parseModels(raw, skillExists) {
     if (labels.has(role.role)) fail(`role "${role.role}" appears twice`);
     labels.add(role.role);
     if (!skillExists(role.skill)) fail(`role "${role.role}" names skill "${role.skill}", which has no SKILL.md`);
+    for (const flag of ["seats", "optional"]) {
+      if (Object.hasOwn(role, flag) && typeof role[flag] !== "boolean") fail(`role "${role.role}" has a non-boolean "${flag}"`);
+    }
+    if (role.models === "inherit-parent") continue;
     if (typeof role.models === "string") {
       if (!Object.hasOwn(raw.tiers, role.models)) {
         fail(`role "${role.role}" names tier "${role.models}", which tiers does not define`);
@@ -645,7 +677,7 @@ export function parseModels(raw, skillExists) {
       if (!/^[a-z]+$/.test(level)) fail(`provider "${provider}" level "${level}" must be lowercase letters`);
     }
   }
-  if (raw.providers.claude?.join() !== raw.efforts.join()) fail(`provider "claude" must list the same levels as efforts`);
+  if (Object.hasOwn(raw.providers, "claude")) fail(`providers lists "claude", whose levels come from efforts`);
   for (const runtime of RUNTIMES) runtime.checkModels?.(raw[runtime.key], { raw, fail, unique, isObject });
   return resolveModels(raw);
 }
@@ -737,9 +769,10 @@ export function providerSeatsSection(models, link) {
     "A role entry written `<provider>:<model>`, with an optional `@<level>`, is a provider seat: it runs on that provider's own CLI and subscription. " +
     `The providers are ${andList(Object.keys(models.providers).map(code))}. [Provider seats](${link}) lists the levels each takes and the seat runner's command. ` +
     "An entry for the runtime you are on, `claude:` on Claude Code or `codex:` on Codex, is an ordinary subagent with that model and level. " +
-    "Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, with the same prompt written to a self-contained file, and read its output file when it finishes. " +
-    "A seat reads files under its working directory but cannot edit them, run commands, or reach this session's MCP tools, so it returns text: a design, a review, or a verdict. " +
-    "A provider counts as its own model family. " +
+    "Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, and read its answer file when it finishes. " +
+    "The `Agent` rules in this skill, including any fallback for a rejected entry, apply only to entries without a prefix. " +
+    "A seat cannot edit files, load skills, or reach this session's MCP tools, so its prompt file carries everything a subagent would get, with every skill or reference the prompt names pasted in, and it returns text: a design, a review, or a verdict. " +
+    "A seat's provider counts as a model family different from the parent's when the parent runs on another provider. " +
     "A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model."
   );
 }
@@ -793,7 +826,8 @@ export function setupModelsSection(models) {
     `- Single-role default: ${code(models.tiers.default)}\n` +
     `- Provider seat levels: ${Object.entries(models.providers)
       .map(([provider, levels]) => `${code(provider)} (${levels.join(", ")})`)
-      .join(", ")}`
+      .join(", ")}\n` +
+    `- Roles that take provider seats: ${codeList(seatRoles(models))}`
   );
 }
 
@@ -811,8 +845,8 @@ export function overrideSheetBlock(models) {
     "the role's subagent then runs at that level, each entry of a panel list on its own. " +
     "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
     "An entry written `<provider>:<model>`, as in `grok:<model> @xhigh`, is a provider seat that runs on that provider's own CLI " +
-    "(providers: " + Object.keys(models.providers).join(", ") + "; each takes its own levels). Use seats on panel, judge, and reviewer lines. " +
-    "`panel vendors: any` lets a panel name models from one vendor, where a provider counts as a vendor. " +
+    "(providers: " + Object.keys(models.providers).join(", ") + "; each takes its own levels). Only these lines take seats: " + seatRoles(models).join("; ") + ". " +
+    "`panel vendors: any` lets a panel name models from one vendor. " +
     "`session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +

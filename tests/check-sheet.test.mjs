@@ -69,17 +69,41 @@ describe("check-sheet.sh", () => {
     expect(check(sheet({ "architect runners": seats, "thermos reviewers": "grok:grok-4.7 @xhigh, claude:opus @max" }))).toEqual(ok);
   });
 
-  test("rejects a seat level its provider does not list, and an unknown provider", () => {
-    const notAnId = invalid(`\`${roles[0]}\` has an entry that is not a model ID`);
-    expect(check(sheet({ [roles[0]]: "claude:opus @ultra" }))).toEqual(notAnId);
-    expect(check(sheet({ [roles[0]]: "codex:gpt-6-astra @none" }))).toEqual(notAnId);
-    expect(check(sheet({ [roles[0]]: "gemini:gemini-3.8-flash" }))).toEqual(notAnId);
+  test("rejects a seat on a line that does not take one", () =>
+    expect(check(sheet({ [roles[0]]: "grok:grok-4.7" }))).toEqual(invalid(`\`${roles[0]}\` cannot take a provider seat`)));
+
+  test("names a seat level its provider does not list", () => {
+    const levelProblem = invalid("`interrogate reviewers` has a seat level its provider does not list");
+    expect(check(sheet({ "interrogate reviewers": "claude:opus @ultra, grok:grok-4.7, opus" }))).toEqual(levelProblem);
+    expect(check(sheet({ "interrogate reviewers": "codex:gpt-6-astra @none, grok:grok-4.7, opus" }))).toEqual(levelProblem);
   });
 
-  test("counts a seat's provider as its vendor in a panel", () => {
-    const oneProvider = sheet({ "interrogate reviewers": "grok:grok-4.7 @xhigh, grok:grok-4.6" });
-    expect(check(oneProvider)).toEqual(invalid("`interrogate reviewers` has models from one vendor (grok)"));
-    expect(check(sheet({ "interrogate reviewers": "grok:grok-4.7 @xhigh, grok:grok-4.6" }, ["panel vendors: any"]))).toEqual(ok);
+  test("rejects a prefix that names no provider", () =>
+    expect(check(sheet({ "interrogate reviewers": "gemini:gemini-3.8-flash, grok:grok-4.7, opus" }))).toEqual(
+      invalid("`interrogate reviewers` has an entry that is not a model ID"),
+    ));
+
+  test("counts the same model once in a panel, with or without a prefix", () => {
+    expect(check(sheet({ "interrogate reviewers": "claude:opus, opus" }))).toEqual(invalid("`interrogate reviewers` has models from one vendor (opus)"));
+    expect(check(sheet({ "interrogate reviewers": "codex:gpt-6-astra, gpt-6-astra" }))).toEqual(invalid("`interrogate reviewers` has models from one vendor (gpt)"));
+    const oneProvider = { "interrogate reviewers": "grok:grok-4.7 @xhigh, grok:grok-4.6" };
+    expect(check(sheet(oneProvider))).toEqual(invalid("`interrogate reviewers` has models from one vendor (grok)"));
+    expect(check(sheet(oneProvider, ["panel vendors: any"]))).toEqual(ok);
+  });
+
+  test("passes a sheet written before the optional thermos reviewers role", () =>
+    expect(check(sheet({ "thermos reviewers": null }))).toEqual(ok));
+
+  test("keeps seats out of the saved model list the Copilot task check enforces", () => {
+    writeFileSync(sheetPath, sheet({ "interrogate reviewers": "grok:grok-4.7 @xhigh, claude-opus-5" }));
+    const scripts = join(pluginRoot, "skills/setup-pstack/scripts");
+    const driver = join(home, "model-list.awk");
+    writeFileSync(driver, "{ sheet_add($0) }\nEND { sheet_problems(); print MODEL_LIST }\n");
+    const r = spawnSync("sh", ["-c", `sh "${scripts}/read-sheet.sh" "${sheetPath}" | LC_ALL=C awk -f "${scripts}/sheet.awk" -f "${driver}"`], {
+      encoding: "utf8",
+    });
+    expect(r.stdout).toContain("`claude-opus-5`");
+    expect(r.stdout).not.toContain("grok");
   });
 
   test("reads the Copilot sheet when no path is given", () => {

@@ -207,7 +207,9 @@ interrogate reviewers: grok:grok-4.7 @xhigh, opus @max
 thermos reviewers: grok:grok-4.7 @xhigh, opus @max
 ```
 
-`arena`, `architect`, `interrogate`, and `thermos` take seats. An entry for the runtime you are on runs as an ordinary subagent. Every other seat runs through [`seat.mjs`](../plugins/pstack/skills/poteto-mode/scripts/seat.mjs), read-only, headless, and isolated from the machine's agent configuration, and writes its answer to a file. A failed seat is a dropout that the skill reports; it never reruns on another model. Each seat needs its CLI installed and signed in: Grok Build (`grok`), Codex (`codex`), or Claude Code (`claude`). The [provider seats reference](../plugins/pstack/skills/poteto-mode/references/provider-seats.md) covers the roles seats fit, the runner's command, and failure handling.
+Only the panel, judge, and reviewer lines of `arena`, `architect`, `interrogate`, and `thermos` take seats; the sheet checker rejects a seat anywhere else. An entry for the runtime you are on runs as an ordinary subagent. Every other seat runs through [`seat.mjs`](../plugins/pstack/skills/poteto-mode/scripts/seat.mjs), which starts the provider's CLI headless with its read tools only and a scrubbed environment, and writes its answer to a file: Grok Build in its strict sandbox, `codex exec` in its read-only sandbox, and Claude Code in safe and restricted mode. A failed seat is a dropout that the skill reports; it never reruns on another model. Each seat needs its CLI installed and signed in, and the runner needs network access, so a sandboxed shell such as Codex's must run it with escalated permissions. The [provider seats reference](../plugins/pstack/skills/poteto-mode/references/provider-seats.md) covers what each provider can still see, the runner's command, and failure handling.
+
+`thermos reviewers` is optional and defaults to `inherit-parent`, so a sheet without it runs both thermos passes once on the parent model, as before.
 
 ## Maintenance
 

@@ -69,6 +69,10 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow Muse's bundled skill-authoring guidance and the Agent Skills shape. Keep `name` plus `description` frontmatter and progressive disclosure. |
 | `loop` (recurring/self-paced re-invocation, used by `babysit`) | `cron_create` on a cadence, or `monitor` on the PR or job. Re-run the step yourself when neither fits. |
 
+## Provider seats
+
+An entry written `<provider>:<model>` is a provider seat: run it through the seat runner in [provider seats](provider-seats.md), never as the model of a Workflow child or a `subagent_spawn` call. The per-skill notes below cover entries without a prefix.
+
 ## Per-skill notes
 
 Affected skill entry points point here. Most skills need only the tables above. These need one more mapping:

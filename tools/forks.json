@@ -14,7 +14,7 @@
     },
     "plugins/pstack/skills/arena/SKILL.md": {
       "kind": "port-feature",
-      "why": "Runs provider-prefixed runner and cross-judge entries as provider seats on other providers' CLIs, so a panel can mix providers where the runtime's subagent tool reaches only its own.",
+      "why": "Runs provider-prefixed runner and cross-judge entries as provider seats on other providers' CLIs, scopes the Agent fallback to unprefixed entries, and keeps code-writing candidates on the runtime's subagents.",
       "since": "0.9.97",
       "upstream": "not-proposed"
     },
@@ -38,7 +38,7 @@
     },
     "plugins/pstack/skills/interrogate/SKILL.md": {
       "kind": "port-feature",
-      "why": "Runs provider-prefixed reviewer entries as provider seats with the same filled-in template, restoring cross-provider review diversity on single-provider runtimes.",
+      "why": "Runs provider-prefixed reviewer entries as provider seats with the same filled-in template and scopes the Agent fallback to unprefixed entries, restoring cross-provider review diversity on single-provider runtimes.",
       "since": "0.9.97",
       "upstream": "not-proposed"
     },
@@ -304,7 +304,7 @@
     },
     "plugins/pstack/skills/thermos/SKILL.md": {
       "kind": "policy",
-      "why": "Runs both passes once per entry on a configurable thermos reviewers line, including provider seats, and weights findings that reviewers from different providers raised independently.",
+      "why": "Runs both passes once per entry on an optional thermos reviewers line, including provider seats that skip rubric steps they cannot run, and weights findings that reviewers from different providers raised independently.",
       "since": "0.9.97",
       "upstream": "not-proposed"
     }

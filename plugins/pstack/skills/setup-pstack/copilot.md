@@ -45,14 +45,15 @@ When the detected set plus `inherit-parent` is 8 choices or fewer, skip the vend
 
 ## Roles by tier
 
-Each tier question below writes every role in its row. The panel row's roles each take the whole panel list.
+Each tier question below writes every role in its row. The panel row's roles each take the whole panel list. The parent row's roles take no question: write each as `inherit-parent`.
 
 | Tier | Roles |
 | --- | --- |
-| Default | `bug-fix`, `perf-issue`, `hillclimb`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers`, `thermos reviewers` |
+| Default | `bug-fix`, `perf-issue`, `hillclimb`, `judgment and prose`, `how explorer`, `how explainer`, `why investigators`, `why synthesizer`, `reflect tooling`, `reflect judgment, divergent, synthesizer`, `swarm workers` |
 | Strongest | `strongest judgment` |
 | Worker | `feature, refactoring` |
 | Panel | `arena runners`, `arena cross-judge pool`, `architect runners`, `interrogate reviewers` |
+| Parent | `thermos reviewers` |
 
 ## Question sequence
 

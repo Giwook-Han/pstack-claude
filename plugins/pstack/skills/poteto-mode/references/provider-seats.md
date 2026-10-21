@@ -11,6 +11,8 @@ architect runners: grok:grok-4.7 @xhigh, grok:grok-4.7 @xhigh, codex:gpt-6-astra
 interrogate reviewers: grok:grok-4.7 @xhigh, opus @max
 ```
 
+An entry without a level takes the sheet's `default effort` when that is one of its provider's levels; append it to the entry you pass the runner. `session` passes no level, so the CLI uses its own default.
+
 ## Levels
 
 Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A model can accept fewer levels than its provider lists; the provider's CLI then fails the seat.
@@ -23,14 +25,14 @@ Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs
 
 ## Where seats fit
 
-A seat reads files under its working directory and returns one answer. It cannot edit files, run shell commands, spawn subagents, search the web, or use this session's MCP tools. Put seats on lines whose subagents return text:
+Roles that take seats: `arena runners`, `arena cross-judge pool`, `architect runners`, `interrogate reviewers`, and `thermos reviewers`.
 
-- `architect runners`: each seat returns its sketch, which becomes its candidate.
-- `arena runners`, when the artifact is text, such as a design, plan, or document. Candidates that must write code in their own worktree stay on the runtime's subagents.
-- `arena cross-judge pool`: a seat gives the arena a judge from another provider.
-- `interrogate reviewers` and `thermos reviewers`.
+The sheet checker rejects a seat on any other line. A seat answers in text and cannot edit files, so:
 
-Keep the other roles on the runtime's own models. Their subagents edit code, run commands, or gather evidence through MCP tools.
+- On `architect runners`, each seat's sketch is its candidate.
+- On `arena runners`, use seats only when the artifact is text, such as a design, plan, or document. When candidates write code in their own worktrees, keep every runner on the runtime's subagents.
+- On `arena cross-judge pool`, a seat gives the arena a judge from another provider.
+- On `interrogate reviewers` and `thermos reviewers`, each seat is one reviewer.
 
 ## Native entries
 
@@ -43,27 +45,27 @@ Every other provider runs through the seat runner.
 
 ## Run a seat
 
-1. Write the seat's prompt to its own file. It must stand alone: the template and fill-ins the skill gives a subagent, absolute paths for any file the seat should read, and the diff or excerpts inline. Ask for the whole answer as the final message.
+1. Write the seat's prompt to its own file, outside the directory the seat reads. It must stand alone. A seat loads no skills and has no access to the plugin's files, so paste in every skill, principle, template, or reference file the skill's prompt names, with the diff or excerpts inline. Where the template asks for files to be written, ask for that content in the final message. The runner puts a short preamble ahead of the prompt that tells the seat to answer directly and not to route through skills or subagents.
 2. From the installed plugin root, start one runner per seat with the shell tool in the background, in the same message as the skill's subagent calls:
 
    ```shell
    node skills/poteto-mode/scripts/seat.mjs --seat '<entry>' --prompt-file <prompt file> --out <answer file> --cwd <repository root>
    ```
 
-   Put each answer file where the skill puts that seat's output, such as an arena candidate's directory.
-3. When a runner exits, its stdout is one JSON line with `status` (`ok`, `failed`, or `timeout`), `seconds`, `out`, `log`, and `error` when it failed. On `ok`, read the answer file as you would a subagent's report. The `log` file keeps the CLI's raw output for debugging.
+   Put each answer file where the skill puts that seat's output, such as an arena candidate's directory. The runner needs network access and writes under the provider's home directory (`~/.grok`, `~/.codex`, or `~/.claude`). From a sandboxed shell, such as Codex's default sandbox, request escalated permissions for the command, or every seat fails.
+3. When a runner exits, its stdout is one JSON line with `status` (`ok`, `failed`, or `timeout`), `seconds`, `out`, `log`, and `error` when it failed. On `ok`, read the answer file as you would a subagent's report. The log keeps the CLI's raw output in the system temp directory, away from the answer, so a judge reading a candidate's directory cannot tell which provider wrote it. `--log` moves it.
 
 `--timeout-sec` overrides the 3600-second limit, and `--dry-run` prints the resolved command without running it.
 
-Label each seat by its entry in the skill's output, as in "Reviewer B: grok:grok-4.7 @xhigh", so the agreement map shows which provider raised what.
+Label each seat by its entry in the skill's output, as in "Reviewer B: grok:grok-4.7 @xhigh", so the agreement map shows which provider raised what. Do not show those labels to an arena's cross-judge.
 
 ## What the runner runs
 
-Each provider runs read-only and headless, isolated from this machine's agent configuration:
+Every seat starts from a scrubbed environment that keeps the system basics, proxy and certificate settings, and its own provider's config and credential variables. Each provider then runs headless with its read tools only:
 
-- `grok`: Grok Build with `--prompt-file` and JSON output, its read, grep, and list tools only, and subagents, web search, and update checks off. Its Claude Code and Cursor compatibility scans are off, so the seat loads none of this machine's `CLAUDE.md`, Claude skills, hooks, rules, or MCP servers.
-- `codex`: `codex exec --ephemeral --ignore-user-config --ignore-rules` in the `read-only` sandbox, with the prompt on stdin and the final message written by `-o`.
-- `claude`: `claude -p` in the `dontAsk` permission mode with only `Read`, `Grep`, and `Glob` allowed, user settings and MCP servers off, and no saved session. It keeps the subscription login, which `--bare` would drop.
+- `grok`: Grok Build in its `strict` sandbox, which confines reads to the working directory, system paths, the temp directory, and `~/.grok`. Only its read, grep, and list tools are on; MCP tools are denied; subagents, web search, and update checks are off. Its Claude Code, Cursor, and Codex compatibility scans are off, and the sandbox keeps it from loading Claude Code plugins, so the seat sees none of their rules, skills, hooks, or MCP servers. Hooks under `~/.grok` still run.
+- `codex`: `codex exec --ephemeral --ignore-user-config --ignore-rules` in the `read-only` sandbox, with subagents and hooks off. It can read files and run commands that write nothing. It still receives the user's `AGENTS.md` and installed skills list, which the runner's preamble overrides for routing.
+- `claude`: `claude -p` in safe mode, which drops `CLAUDE.md`, skills, plugins, hooks, and MCP servers but keeps the subscription login, with no settings files loaded. Restricted mode confines its file tools to the working directory, and only `Read`, `Grep`, and `Glob` exist.
 
 ## Before a long run
 
@@ -71,4 +73,4 @@ Check each provider once with `grok models`, `codex login status`, or `claude au
 
 ## Failures
 
-A seat that fails, times out, or returns an empty answer is a dropout. Continue with the other seats, list the dropped seat with its error in the skill's output, and say that model diversity was reduced. Do not rerun the seat on another model or provider: a silent substitution hides the lost diversity the panel exists for. A review gate whose every reviewer dropped stays closed, as the Subagents section of the **poteto-mode** skill describes.
+A seat fails when its CLI cannot start, exits with an error, times out, stops early (a refusal or a cut-off turn), or returns an empty answer. A failed seat is a dropout. Continue with the other seats, list the dropped seat with its error in the skill's output, and say that model diversity was reduced. Do not rerun the seat on another model or provider: a silent substitution hides the lost diversity the panel exists for. Stopping the runner stops its CLI. A review gate whose every reviewer dropped stays closed, as the Subagents section of the **poteto-mode** skill describes.

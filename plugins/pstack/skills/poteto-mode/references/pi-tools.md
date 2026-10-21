@@ -80,6 +80,10 @@ The [driver policy](../SKILL.md#non-negotiables) selects the app driver. For ski
 | `plugin-dev:skill-development` (Claude's SKILL.md authoring guidance) | Follow Pi's skills documentation and the Agent Skills specification. Keep `name` + `description` frontmatter, name the directory after the skill, and use progressive disclosure. |
 | `loop` (recurring/self-paced re-invocation, used by `babysit`) | The extension's `/loop [interval] <prompt>` command. With an interval it re-fires on that cadence. Without one the prompt runs now and the model paces itself with `schedule_wakeup`. `/loop stop` cancels, also while an iteration runs: nothing that run then schedules is armed. A `/loop` given during a run starts once that run ends. |
 
+## Provider seats
+
+An entry written `<provider>:<model>` is a provider seat: run it through the seat runner in [provider seats](provider-seats.md), never as an `agent` model alias. The per-skill notes below cover entries without a prefix.
+
 ## Per-skill notes
 
 No skill file carries a Pi line. poteto-mode's Platform Adaptation section points here once, and the extension's system prompt points here in every session, so read a skill's row before you follow that skill. Most skills need only the tables above. These need one more mapping:

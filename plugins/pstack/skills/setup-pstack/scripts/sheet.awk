@@ -5,8 +5,10 @@
 
 # Fills roles[1..n] with the roles every sheet names, in sheet order, and
 # panel[role] for the panel lists, SHEET_EFFORT[level] for the reasoning
-# effort levels, SHEET_PROVIDER[provider] for the provider-seat prefixes, and
-# SHEET_PROVIDER_EFFORT[provider, level] for each provider's levels. Returns n.
+# effort levels, SHEET_PROVIDER[provider] for the provider-seat prefixes,
+# SHEET_PROVIDER_EFFORT[provider, level] for each provider's levels,
+# SHEET_SEAT_ROLE[role] for the roles that take seats, and SHEET_OPTIONAL[role]
+# for the roles a sheet may leave out. Returns n.
 function sheet_roles(roles, panel,    n) {
   split("", roles)
   split("", panel)
@@ -61,6 +63,12 @@ function sheet_roles(roles, panel,    n) {
   SHEET_PROVIDER_EFFORT["grok", "high"] = 1
   SHEET_PROVIDER_EFFORT["grok", "xhigh"] = 1
   SHEET_PROVIDER_EFFORT["grok", "max"] = 1
+  SHEET_SEAT_ROLE["arena runners"] = 1
+  SHEET_SEAT_ROLE["arena cross-judge pool"] = 1
+  SHEET_SEAT_ROLE["architect runners"] = 1
+  SHEET_SEAT_ROLE["interrogate reviewers"] = 1
+  SHEET_SEAT_ROLE["thermos reviewers"] = 1
+  SHEET_OPTIONAL["thermos reviewers"] = 1
   return n
 }
 
@@ -124,11 +132,10 @@ function sheet_alias(id) {
   return id == "inherit-parent" || id == "auto"
 }
 
-# A seat's vendor is its provider; any other ID's vendor is its first
-# hyphen-separated word.
-function sheet_vendor(id,    p) {
-  p = sheet_provider(id)
-  if (p != "") return p
+# An ID's vendor is the first hyphen-separated word of its model, so a seat
+# and the same model without a prefix count once.
+function sheet_vendor(id) {
+  id = sheet_seat_model(id)
   sub(/-.*/, "", id)
   return id
 }
@@ -150,12 +157,16 @@ function sheet_value(line) {
 # with models from fewer than two vendors without a `panel vendors: any` line.
 # A problem quotes no unchecked sheet text, since the hook adds it to the
 # session context.
+# A provider seat (`<provider>:<model>`) is checked against its provider's
+# levels and allowed only on a SHEET_SEAT_ROLE line, and a SHEET_OPTIONAL role
+# may be missing.
 # On success, SHEET_MODELS is the model set, MODEL_LIST its display list of
-# explicit IDs, and MODEL_ALIASES records whether any role inherits its model.
+# explicit IDs, both without seats, and MODEL_ALIASES records whether any role
+# inherits its model.
 # Whatever the result, SHEET_OK[role] is 1 when that role's line has only
 # usable entries, and SHEET_EFFORT_OK is 1 when a usable default effort line
 # exists, for readers that keep a sheet's good lines and drop the rest.
-function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e, V, nv, vl, real, bad) {
+function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e, V, nv, vl, real, bad, seat) {
   n = sheet_roles(roles, panel)
   split("", want)
   for (i = 1; i <= n; i++) want[roles[i]] = 1
@@ -171,7 +182,7 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
     else if (key == "panel vendors" && sheet_value(SHEET[i]) == "any") any = 1
   }
   out = ""
-  for (i = 1; i <= n; i++) if (!(roles[i] in VALUE)) out = out "; missing role `" roles[i] "`"
+  for (i = 1; i <= n; i++) if (!(roles[i] in VALUE) && !(roles[i] in SHEET_OPTIONAL)) out = out "; missing role `" roles[i] "`"
   SHEET_EFFORT_OK = ("default effort" in VALUE) && (VALUE["default effort"] == "session" || (VALUE["default effort"] in SHEET_EFFORT))
   if (("default effort" in VALUE) && !SHEET_EFFORT_OK) out = out "; default effort is not session or a level"
   for (i = 1; i <= n; i++) {
@@ -188,9 +199,14 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
       e = sheet_model(sheet_trim(E[j]))
       if (e == "") { out = out "; an empty entry in `" key "`"; bad = 1; continue }
       if (sheet_alias(e)) { MODEL_ALIASES = 1; SHEET_MODELS[e] = 1; continue }
+      seat = sheet_provider(e) != ""
+      if (seat && !(key in SHEET_SEAT_ROLE)) { out = out "; `" key "` cannot take a provider seat"; bad = 1; continue }
+      if (seat && e ~ /[ \t]+@[a-z]+$/) { out = out "; `" key "` has a seat level its provider does not list"; bad = 1; continue }
       if (sheet_seat_model(e) !~ /^[a-z0-9][a-z0-9.-]*$/) { out = out "; `" key "` has an entry that is not a model ID"; bad = 1; continue }
-      if (!(e in SHEET_MODELS)) MODEL_LIST = MODEL_LIST (MODEL_LIST == "" ? "" : ", ") "`" e "`"
-      SHEET_MODELS[e] = 1
+      # A seat runs on its provider's CLI, so it is never a model for the
+      # runtime's own dispatch tool and stays out of the saved model set.
+      if (!seat && !(e in SHEET_MODELS)) MODEL_LIST = MODEL_LIST (MODEL_LIST == "" ? "" : ", ") "`" e "`"
+      if (!seat) SHEET_MODELS[e] = 1
       real = 1
       if (!(sheet_vendor(e) in V)) {
         V[sheet_vendor(e)] = 1

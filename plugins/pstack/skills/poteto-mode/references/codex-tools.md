@@ -56,7 +56,7 @@ Skills name Claude defaults (a single-role default for code/prose/judgment, a wo
 
 ## Provider seats
 
-A panel, judge, or reviewer entry written `codex:<model>` runs as an ordinary `spawn_agent` child with that model and its level as `reasoning_effort`. Entries for other providers, such as `claude:` or `grok:`, run through the seat runner in [provider seats](provider-seats.md). Codex model rows live in `AGENTS.md`, so write seat entries there in the same `<provider>:<model>` form.
+A panel, judge, or reviewer entry written `codex:<model>` runs as an ordinary `spawn_agent` child with that model and its level as `reasoning_effort`. Entries for other providers, such as `claude:` or `grok:`, run through the seat runner in [provider seats](provider-seats.md), never as a substituted Codex model. The runner needs network access and writes under the provider's home directory, which Codex's default sandbox blocks, so request escalated permissions for each runner command. Codex model rows live in `AGENTS.md`, so write seat entries there in the same `<provider>:<model>` form.
 
 ## Session routing hook
 
@@ -81,10 +81,10 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 
 | Skill | On Codex |
 |-------|----------|
-| `interrogate` | The `subagent_type`/`model`/`readonly` dispatch fields map to `spawn_agent`; substitute your configured Codex models and keep the reviewer panel model-diverse. |
+| `interrogate` | The `subagent_type`/`model`/`readonly` dispatch fields map to `spawn_agent`; substitute your configured Codex models and keep the reviewer panel model-diverse. A provider-prefixed entry is a provider seat instead (see Provider seats above). |
 | `setup-pstack` | The skill's Other runtimes table names the Codex sheet path and how it loads; the slugs are your Codex models (see Model names above). The role rows are identical. |
 | `no-comments` | There is no `comment-sicko` subagent type; see Subagent policy above. |
-| `thermos` | There are no thermo-nuclear subagent types; see Subagent policy above. |
+| `thermos` | There are no thermo-nuclear subagent types; see Subagent policy above. Run both passes once per `thermos reviewers` entry; a provider-prefixed entry runs each pass as a provider seat (see Provider seats above). |
 | `teach` | Running `how` and `why` in parallel maps to `spawn_agent` fan-out; image generation uses the configured Codex equivalent. |
 | `create-verification-skill` | The generated skill lands under `.claude/skills/verify/` on Claude Code; write it to Codex's project-skill location instead. The app-driving harness is platform-neutral. |
 | `maintain-verification-skill` | The parallel per-feature source readers map to `spawn_agent` fan-out; the project-local skill lives under Codex's skills location, not `.claude/skills/`. |
@@ -93,7 +93,7 @@ Affected skill entry points and the optional Codex slash stubs point here. Most 
 | `babysit` | `loop` and `AskUserQuestion` resolve through the tables above. |
 | `automate-me` | `plugin-dev:skill-development` resolves through the skills table above. |
 | `architect` | The runner panel goes through the **arena** skill, so its `spawn_agent` fan-out and model substitution apply here too. |
-| `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; substitute your configured Codex models for the runners and the cross-judge pool (see Model names above). |
+| `arena` | The parallel candidates and the cross-judge map to `spawn_agent`; substitute your configured Codex models for the runners and the cross-judge pool (see Model names above). A provider-prefixed entry is a provider seat, not a substituted model (see Provider seats above). |
 | `how` | The parallel explorers and the explainer map to `spawn_agent` fan-out; substitute your configured Codex models. |
 | `reflect` | The three reviewers and the synthesizer map to `spawn_agent`; substitute your configured Codex models. The transcript finder reads Claude Code's layout under `~/.claude/projects/`, so pass the session digest step 1 allows instead. |
 | `swarm` | Each worker is a `spawn_agent` call on your configured Codex model, and those calls already run concurrently; give each writing worker its own worktree or output directory (see Subagent policy above). |

@@ -194,13 +194,27 @@ describe("providers", () => {
     return () => parseModels(policy, () => true);
   };
 
-  test("the claude provider lists the Agent tool's effort levels", () => expect(raw.providers.claude).toEqual(raw.efforts));
+  test("claude takes the effort levels, which models.json does not repeat", () => {
+    expect(raw.providers.claude).toBeUndefined();
+    expect(models.providers.claude).toEqual(raw.efforts);
+  });
 
   test("a malformed providers block throws naming the provider", () => {
     expect(parse((p) => delete p.providers)).toThrow('models.json: "providers" must be an object');
     expect(parse((p) => (p.providers.grok = []))).toThrow('models.json: provider "grok" needs a non-empty list of levels');
     expect(parse((p) => (p.providers.codex = ["ultra", "ultra"]))).toThrow('models.json: provider "codex" lists "ultra" twice');
     expect(parse((p) => (p.providers["Grok"] = ["max"]))).toThrow('models.json: provider "Grok" must be lowercase letters');
-    expect(parse((p) => (p.providers.claude = ["low"]))).toThrow('models.json: provider "claude" must list the same levels as efforts');
+    expect(parse((p) => (p.providers.claude = ["low"]))).toThrow('models.json: providers lists "claude", whose levels come from efforts');
   });
+
+  test("a role may default to the parent session's model, under the parent pseudo-tier", () => {
+    const thermos = models.roles.find((r) => r.role === "thermos reviewers");
+    expect(thermos.models).toEqual(["inherit-parent"]);
+    expect(thermos.tier).toBe("parent");
+  });
+
+  test("a role's seats and optional flags are booleans", () =>
+    expect(parse((p) => (p.roles.find((r) => r.role === "arena runners").seats = "yes"))).toThrow(
+      'models.json: role "arena runners" has a non-boolean "seats"',
+    ));
 });

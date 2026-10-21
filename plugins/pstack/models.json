@@ -21,15 +21,14 @@
     { "role": "why synthesizer", "models": "default", "skill": "why" },
     { "role": "reflect tooling", "models": "default", "skill": "reflect" },
     { "role": "reflect judgment, divergent, synthesizer", "models": "default", "skill": "reflect" },
-    { "role": "arena runners", "models": "panel", "skill": "arena" },
-    { "role": "arena cross-judge pool", "models": "panel", "skill": "arena" },
+    { "role": "arena runners", "models": "panel", "skill": "arena", "seats": true },
+    { "role": "arena cross-judge pool", "models": "panel", "skill": "arena", "seats": true },
     { "role": "swarm workers", "models": "default", "skill": "swarm" },
-    { "role": "architect runners", "models": "panel", "skill": "architect" },
-    { "role": "interrogate reviewers", "models": "panel", "skill": "interrogate" },
-    { "role": "thermos reviewers", "models": "default", "skill": "thermos" }
+    { "role": "architect runners", "models": "panel", "skill": "architect", "seats": true },
+    { "role": "interrogate reviewers", "models": "panel", "skill": "interrogate", "seats": true },
+    { "role": "thermos reviewers", "models": "inherit-parent", "skill": "thermos", "seats": true, "optional": true }
   ],
   "providers": {
-    "claude": ["low", "medium", "high", "xhigh", "max"],
     "codex": ["minimal", "low", "medium", "high", "xhigh", "max", "ultra"],
     "grok": ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
   },

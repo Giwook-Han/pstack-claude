@@ -21,7 +21,7 @@ Run the two thermo review passes as async background subagents in parallel, once
    - `subagent_type: "pstack:thermo-nuclear-review-subagent"` for bugs, breakages, security, devex regressions, feature-flag leaks, and other branch-audit risks.
    - `subagent_type: "pstack:thermo-nuclear-code-quality-review-subagent"` for maintainability, structure, file-size growth, spaghetti, abstractions, and codebase-health risks.
 
-   Set `model` and the level from the entry, and omit `model` for `inherit-parent` or `auto`. An entry with a provider prefix runs each pass as a provider seat per [Provider seats](#provider-seats). The seat's prompt is the pass's rubric skill, [thermo-nuclear-review](../thermo-nuclear-review/SKILL.md) or [thermo-nuclear-code-quality-review](../thermo-nuclear-code-quality-review/SKILL.md), followed by the scoped context.
+   Set `model` and the level from the entry, and omit `model` for `inherit-parent` or `auto`. An entry with a provider prefix runs each pass as a provider seat per [Provider seats](#provider-seats). The seat's prompt is the pass's rubric skill, [thermo-nuclear-review](../thermo-nuclear-review/SKILL.md) or [thermo-nuclear-code-quality-review](../thermo-nuclear-code-quality-review/SKILL.md), followed by the scoped context. A seat skips any rubric step it cannot run, such as a `gh` call, and says which.
 4. Pass each subagent the same scoped diff/file context and ask it to return prioritized findings with file references and evidence.
 5. After every pass finishes, synthesize the results with findings first, deduplicated across reviewers. Weight overlapping findings more heavily, most of all one that reviewers from different providers raised independently. Resolve disagreements with your own judgment and keep summaries brief.
 
@@ -31,7 +31,7 @@ If individual background summaries are already visible to the user, do not resta
 
 Role defaults, stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). A matching role line in the `pstack-models.md` override sheet overrides each at runtime; `/setup-pstack` writes it and lists its path per runtime.
 
-- thermos reviewers: `opus`
+- thermos reviewers: `inherit-parent`
 
 ## Reasoning effort
 
@@ -39,4 +39,4 @@ A role value in the override sheet may name a reasoning effort after its model, 
 
 ## Provider seats
 
-A role entry written `<provider>:<model>`, with an optional `@<level>`, is a provider seat: it runs on that provider's own CLI and subscription. The providers are `claude`, `codex`, and `grok`. [Provider seats](../poteto-mode/references/provider-seats.md) lists the levels each takes and the seat runner's command. An entry for the runtime you are on, `claude:` on Claude Code or `codex:` on Codex, is an ordinary subagent with that model and level. Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, with the same prompt written to a self-contained file, and read its output file when it finishes. A seat reads files under its working directory but cannot edit them, run commands, or reach this session's MCP tools, so it returns text: a design, a review, or a verdict. A provider counts as its own model family. A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model.
+A role entry written `<provider>:<model>`, with an optional `@<level>`, is a provider seat: it runs on that provider's own CLI and subscription. The providers are `claude`, `codex`, and `grok`. [Provider seats](../poteto-mode/references/provider-seats.md) lists the levels each takes and the seat runner's command. An entry for the runtime you are on, `claude:` on Claude Code or `codex:` on Codex, is an ordinary subagent with that model and level. Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, and read its answer file when it finishes. The `Agent` rules in this skill, including any fallback for a rejected entry, apply only to entries without a prefix. A seat cannot edit files, load skills, or reach this session's MCP tools, so its prompt file carries everything a subagent would get, with every skill or reference the prompt names pasted in, and it returns text: a design, a review, or a verdict. A seat's provider counts as a model family different from the parent's when the parent runs on another provider. A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model.
