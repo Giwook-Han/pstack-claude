@@ -1,23 +1,26 @@
 #!/usr/bin/env node
-// Runs one provider seat: a panel, judge, or reviewer entry from pstack-models.md
-// written `<provider>:<model>`, with an optional `@<level>`, on that provider's
-// own CLI and subscription. The seat runs headless with read-only tools, isolated
-// from this machine's agent configuration as far as each CLI allows, and its
-// final answer lands in --out.
+// Runs one provider seat on that provider's own CLI and subscription. A seat is
+// any entry written `<provider>:<model>`, with an optional `@<level>`, on a
+// pstack-models.md line that takes seats. The seat runs headless, isolated from
+// this machine's agent configuration as far as each CLI allows, with read-only
+// tools or, under --write, file tools that edit only the clean linked git
+// worktree --cwd names. Its final answer lands in --out.
 //
 // Usage:
 //   node seat.mjs --seat '<entry>' --prompt-file <file> --out <file>
-//                 [--cwd <dir>] [--log <file>] [--timeout-sec <n>] [--dry-run]
+//                 [--cwd <dir>] [--write] [--log <file>] [--timeout-sec <n>] [--dry-run]
 //
 // Prints one JSON line: { seat, provider, model, level, status, seconds, out, log,
-// stopReason?, error? }. Exit 0 when the seat answered, 1 when it failed or timed
-// out, 2 on a usage error. A failed seat is never retried on another model; the
-// caller records a dropout.
+// stopReason?, write?, changed?, error? }. A write seat adds write: true and the
+// paths it changed, and fails when it changed none, rewrote the worktree's .git
+// file, or left a symlink that leads out of the worktree. Exit 0 when the seat
+// answered, 1 when it failed or timed out, 2 on a usage error. A failed seat is
+// never retried on another model; the caller records a dropout.
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Reasoning levels each provider's CLI accepts, stamped from models.json by
@@ -34,14 +37,19 @@ const KILL_GRACE_MS = 10_000;
 const ERROR_TAIL = 600;
 const WINDOWS = process.platform === "win32";
 
-// Put ahead of every prompt. A seat answers the task it is given; standing
-// instructions it still loads (Codex keeps the user's AGENTS.md) must not
-// route it into skills or subagents.
+// A seat answers the task it is given; standing instructions it still loads
+// (Codex keeps the user's AGENTS.md) must not route it into a skill or slash command.
 export const PREAMBLE =
   "You are one seat of a pstack panel, run headless with read-only tools. Answer the task below directly " +
-  "and completely in your final message. Do not invoke skills, slash commands, or subagents, even if " +
+  "and completely in your final message. Do not invoke skills or slash commands, even if " +
   "standing instructions tell you to route work through a skill first. If the task asks you to write a " +
   "file, put its content in your final message instead.\n\n---\n\n";
+export const WRITE_PREAMBLE =
+  "You are one seat of a pstack panel, run headless in your own git worktree, which is the current directory. " +
+  "Make the task's changes there with your file tools. You cannot write outside it, and a write outside it can " +
+  "end your run. Do not commit. Do not invoke skills or slash commands, even if standing instructions " +
+  "tell you to route work through a skill first. Your final message is your report on the task: what you changed " +
+  "and why.\n\n---\n\n";
 
 class UsageError extends Error {}
 
@@ -91,12 +99,34 @@ export function seatEnv(provider, env = process.env) {
   );
 }
 
-// How each provider runs headless with read-only tools. `promptFile` is the
-// staged copy (preamble plus prompt) in the temp directory, which Grok's strict
-// sandbox can read. `answer` names where the final message comes from: "text"
-// (stdout JSON .text), "result" (stdout JSON .result), or "file" (the CLI
-// writes --out itself).
-export function seatCommand({ provider, model, level }, { promptFile, out, cwd }) {
+// Headless grok refuses an edit no allow rule approves and ends its turn as
+// cancelled, so a write seat's rules approve edits under the worktree only. A
+// codex write seat's sandbox keeps TMPDIR writable, so TMPDIR names a private
+// dir, away from the shared temp directories that hold other seats' files.
+const ACCESS = {
+  grok: {
+    read: { tools: "read_file,grep,list_dir", allow: [] },
+    write: { tools: "read_file,grep,list_dir,search_replace,write", allow: ["Edit", "Write"] },
+  },
+  codex: {
+    read: { sandbox: ["-s", "read-only"] },
+    write: {
+      sandbox: ["-s", "workspace-write", "-c", "sandbox_workspace_write.network_access=false", "-c", "sandbox_workspace_write.exclude_slash_tmp=true"],
+      privateTmp: true,
+    },
+  },
+  claude: {
+    read: { tools: "Read,Grep,Glob" },
+    write: { tools: "Read,Grep,Glob,Edit,Write" },
+  },
+};
+
+// `promptFile` is the staged copy (preamble plus prompt) in the temp directory,
+// which Grok's strict sandbox can read. `answer` names where the final message
+// comes from: "text" (stdout JSON .text), "result" (stdout JSON .result), or
+// "file" (the CLI writes --out itself).
+export function seatCommand({ provider, model, level }, { promptFile, tmpDir, out, cwd, write }) {
+  const access = ACCESS[provider][write ? "write" : "read"];
   if (provider === "grok") {
     return {
       command: "grok",
@@ -107,7 +137,8 @@ export function seatCommand({ provider, model, level }, { promptFile, out, cwd }
         "--output-format", "json",
         "--cwd", cwd,
         "--sandbox", "strict",
-        "--tools", "read_file,grep,list_dir",
+        "--tools", access.tools,
+        ...access.allow.flatMap((tool) => ["--allow", `${tool}(${cwd}/**)`]),
         "--deny", "MCPTool",
         "--no-subagents",
         "--disable-web-search",
@@ -119,25 +150,28 @@ export function seatCommand({ provider, model, level }, { promptFile, out, cwd }
       answer: "text",
     };
   }
+  // A codex seat may start subagents, which inherit its sandbox. It runs without
+  // --ephemeral, which makes spawn_agent fail, so Codex saves the seat's session
+  // and each child's in its history. --disable memories keeps those sessions out
+  // of Codex's cross-session memory if that feature ever defaults to on.
   if (provider === "codex") {
     return {
       command: "codex",
       args: [
         "exec",
-        "--ephemeral",
         "--ignore-user-config",
         "--ignore-rules",
         "--skip-git-repo-check",
-        "-s", "read-only",
-        "--disable", "multi_agent",
+        ...access.sandbox,
         "--disable", "hooks",
+        "--disable", "memories",
         "-C", cwd,
         "-m", model,
         ...(level ? ["-c", `model_reasoning_effort="${level}"`] : []),
         "-o", out,
         "-",
       ],
-      env: {},
+      env: access.privateTmp ? { TMPDIR: tmpDir, TMP: tmpDir, TEMP: tmpDir } : {},
       cwd,
       stdin: promptFile,
       answer: "file",
@@ -146,7 +180,7 @@ export function seatCommand({ provider, model, level }, { promptFile, out, cwd }
   // claude: --safe-mode drops CLAUDE.md, skills, plugins, hooks, and MCP
   // servers but keeps the subscription login, which --bare would not.
   // --restricted confines the file tools to the working directory, and --tools
-  // leaves only the read tools, whatever a settings file allows.
+  // leaves only the mode's tools, whatever a settings file allows.
   return {
     command: "claude",
     args: [
@@ -157,8 +191,8 @@ export function seatCommand({ provider, model, level }, { promptFile, out, cwd }
       "--safe-mode",
       "--restricted",
       "--setting-sources", "",
-      "--tools", "Read,Grep,Glob",
-      "--allowedTools", "Read,Grep,Glob",
+      "--tools", access.tools,
+      "--allowedTools", access.tools,
       "--permission-mode", "dontAsk",
       "--strict-mcp-config",
       "--no-session-persistence",
@@ -171,14 +205,15 @@ export function seatCommand({ provider, model, level }, { promptFile, out, cwd }
 }
 
 function parseArgs(argv) {
-  const opts = { timeoutSec: DEFAULT_TIMEOUT_SEC, dryRun: false };
+  const opts = { timeoutSec: DEFAULT_TIMEOUT_SEC, dryRun: false, write: false };
   const takes = {
     "--seat": "seat", "--prompt-file": "promptFile", "--out": "out", "--cwd": "cwd", "--log": "log", "--timeout-sec": "timeoutSec",
   };
+  const switches = { "--dry-run": "dryRun", "--write": "write" };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--dry-run") {
-      opts.dryRun = true;
+    if (Object.hasOwn(switches, arg)) {
+      opts[switches[arg]] = true;
       continue;
     }
     const eq = arg.indexOf("=");
@@ -191,6 +226,7 @@ function parseArgs(argv) {
   for (const flag of ["--seat", "--prompt-file", "--out"]) {
     if (!opts[takes[flag]]) throw new UsageError(`${flag} is required`);
   }
+  if (opts.write && !opts.cwd) throw new UsageError("--write needs --cwd <worktree>");
   opts.timeoutSec = Number(opts.timeoutSec);
   if (!Number.isFinite(opts.timeoutSec) || opts.timeoutSec <= 0 || opts.timeoutSec > MAX_TIMEOUT_SEC) {
     throw new UsageError(`--timeout-sec must be a number of seconds from 1 to ${MAX_TIMEOUT_SEC}`);
@@ -205,7 +241,101 @@ function parseArgs(argv) {
   if (existsSync(opts.out) && statSync(opts.out).isDirectory()) throw new UsageError(`--out ${opts.out} is a directory; name a file`);
   if (!existsSync(opts.cwd) || !statSync(opts.cwd).isDirectory()) throw new UsageError(`--cwd ${opts.cwd} is not a directory`);
   if (opts.log) opts.log = resolve(opts.log);
-  return opts;
+  return opts.write ? { ...opts, ...parseWorktree(opts) } : opts;
+}
+
+// An inherited GIT_DIR or GIT_WORK_TREE would point git at another repository.
+function git(cwd, args) {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/i.test(key)));
+  const result = spawnSync("git", args, { cwd, env, encoding: "utf8", maxBuffer: Infinity, windowsHide: true });
+  return result.status === 0 ? result.stdout : null;
+}
+
+// Read through `gitDir`, captured before the run, rather than the worktree's
+// .git file, which a seat could rewrite. The -z form puts an R or C entry's
+// original path in a field of its own after the new one.
+function changedPaths(gitDir, root) {
+  const status = git(root, [`--git-dir=${gitDir}`, `--work-tree=${root}`, "status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+  if (status === null) return null;
+  const fields = status.split("\0");
+  const paths = [];
+  for (let i = 0; i < fields.length - 1; i++) {
+    paths.push(fields[i].slice(3));
+    if (/[RC]/.test(fields[i].slice(0, 2))) i++;
+  }
+  return paths;
+}
+
+function realTarget(path) {
+  if (existsSync(path)) return realpathSync.native(path);
+  const parent = dirname(path);
+  return parent === path ? path : join(realTarget(parent), basename(path));
+}
+
+const contains = (root, real) => real === root || real.startsWith(root + sep);
+
+// A relative target joins the link's directory without lexical cleanup, so the
+// kernel resolves each `..` after the links before it, as an edit through the
+// link would. A path that is not a symlink leads to itself, also when a seat
+// deleted it or replaced a directory above it with a file.
+function linkTarget(link) {
+  let target;
+  try {
+    target = readlinkSync(link);
+  } catch {
+    return link;
+  }
+  return realTarget(isAbsolute(target) ? target : dirname(link) + sep + target);
+}
+
+function firstLinkOut(root, dir = root) {
+  for (const name of readdirSync(dir).sort()) {
+    if (name === ".git") continue;
+    const path = join(dir, name);
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() && !contains(root, linkTarget(path))) {
+      return `${relative(root, path)}, a symlink that leads out of the worktree`;
+    }
+    if (!stat.isDirectory() && stat.nlink > 1) return `${relative(root, path)}, a file with more than one hard link`;
+    const inner = stat.isDirectory() && firstLinkOut(root, path);
+    if (inner) return inner;
+  }
+  return null;
+}
+
+// Grok's allow rules splice the worktree's path into a glob and match an edit's
+// path as written, so the path may hold no glob character, and no entry under
+// it, ignored files and checked-out submodules included, may be a symlink that
+// leads out or a file with another hard link, whose other name can sit anywhere.
+function parseWorktree({ cwd, out, log }) {
+  const root = realpathSync.native(cwd);
+  if (/[*?[\]{}]/.test(root)) throw new UsageError(`--cwd ${cwd} has a glob character in its real path; --write needs a worktree path without * ? [ ] { }`);
+  const revParse = (flag) => {
+    const path = git(root, ["rev-parse", flag])?.replace(/\n$/, "");
+    return path && realpathSync.native(resolve(root, path));
+  };
+  if (revParse("--show-toplevel") !== root) throw new UsageError(`--cwd ${cwd} is not the top level of a git worktree`);
+  const gitDir = revParse("--absolute-git-dir");
+  if (gitDir === revParse("--git-common-dir")) {
+    throw new UsageError(`--cwd ${cwd} is the repository's main checkout; --write needs a linked worktree`);
+  }
+  for (const [flag, path] of [["--out", out], ["--log", log]]) {
+    if (path && contains(root, realTarget(path))) throw new UsageError(`${flag} ${path} is inside the worktree`);
+  }
+  const changed = changedPaths(gitDir, root);
+  if (!changed) throw new UsageError(`git status failed in --cwd ${cwd}`);
+  if (changed.length) throw new UsageError(`--cwd ${cwd} has changes; --write needs a clean worktree`);
+  const link = firstLinkOut(root);
+  if (link) throw new UsageError(`--cwd ${cwd} holds ${link}`);
+  return { cwd: root, gitDir, dotGit: readFileSync(join(root, ".git")) };
+}
+
+function holds(path, bytes) {
+  try {
+    return readFileSync(path).equals(bytes);
+  } catch {
+    return false;
+  }
 }
 
 const tail = (text) => {
@@ -320,7 +450,7 @@ async function main(argv) {
     return 2;
   }
   if (opts.dryRun) {
-    const spec = seatCommand(seat, { ...opts, promptFile: `<staged copy of ${opts.promptFile}>` });
+    const spec = seatCommand(seat, { ...opts, promptFile: `<staged copy of ${opts.promptFile}>`, tmpDir: "<private temp dir>" });
     process.stdout.write(JSON.stringify({ ...seat, ...spec, env: { ...spec.env }, keptEnv: Object.keys(seatEnv(seat.provider)) }) + "\n");
     return 0;
   }
@@ -336,8 +466,9 @@ async function main(argv) {
     rmSync(opts.out, { force: true });
     staged = mkdtempSync(join(tmpdir(), "pstack-seat-"));
     const promptFile = join(staged, basename(opts.promptFile));
-    writeFileSync(promptFile, PREAMBLE + readFileSync(opts.promptFile, "utf8"));
-    const spec = { ...seatCommand(seat, { ...opts, promptFile }), provider: seat.provider };
+    writeFileSync(promptFile, (opts.write ? WRITE_PREAMBLE : PREAMBLE) + readFileSync(opts.promptFile, "utf8"));
+    const tmpDir = mkdtempSync(join(staged, "tmp-"));
+    const spec = { ...seatCommand(seat, { ...opts, promptFile, tmpDir }), provider: seat.provider };
     const result = await runSeat(spec, opts);
     summary.seconds = result.seconds;
     writeFileSync(summary.log, `$ ${spec.command} ${spec.args.join(" ")}\n\n[stdout]\n${result.stdout}\n[stderr]\n${result.stderr}`);
@@ -358,6 +489,17 @@ async function main(argv) {
     error = failure.message;
   } finally {
     if (staged) rmSync(staged, { recursive: true, force: true });
+  }
+  if (opts.write) {
+    const changed = changedPaths(opts.gitDir, opts.cwd);
+    summary.write = true;
+    summary.changed = changed ?? [];
+    const append = (problem) => (error = error ? `${error}; ${problem}` : problem);
+    if (!holds(join(opts.cwd, ".git"), opts.dotGit)) append("the seat rewrote the worktree's .git file");
+    else if (!changed) error ??= "git status failed in the worktree";
+    else if (!changed.length) error ??= "the seat changed no files";
+    const escape = changed?.find((path) => !contains(opts.cwd, linkTarget(join(opts.cwd, path))));
+    if (escape) append(`the seat left ${escape}, a symlink that leads out of the worktree`);
   }
   if (error) {
     if (summary.status === "ok") summary.status = "failed";
