@@ -12,6 +12,12 @@
       "since": "0.9.34",
       "upstream": "not-proposed"
     },
+    "plugins/pstack/skills/arena/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Runs provider-prefixed runner and cross-judge entries as provider seats on other providers' CLIs, so a panel can mix providers where the runtime's subagent tool reaches only its own.",
+      "since": "0.9.97",
+      "upstream": "not-proposed"
+    },
     "plugins/pstack/skills/blast-radius/SKILL.md": {
       "kind": "policy",
       "why": "Extends the trigger to run before design when a brief asserts something about existing code.",
@@ -28,6 +34,12 @@
       "kind": "port-feature",
       "why": "Names the generated project skill verify so it replaces Claude Code's bundled user-only /verify and the playbooks can invoke it.",
       "since": "0.9.29",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/interrogate/SKILL.md": {
+      "kind": "port-feature",
+      "why": "Runs provider-prefixed reviewer entries as provider seats with the same filled-in template, restoring cross-provider review diversity on single-provider runtimes.",
+      "since": "0.9.97",
       "upstream": "not-proposed"
     },
     "plugins/pstack/skills/poteto-help/SKILL.md": {
@@ -242,7 +254,7 @@
     },
     "plugins/pstack/skills/setup-pstack/SKILL.md": {
       "kind": "port-feature",
-      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels, adds the SessionStart hook toggle and names the Pi extension as a reader of it, lists every runtime's sheet path in a table, routes GitHub Copilot to copilot.md, and numbers its verification and formal verification offers as steps 9 and 10.",
+      "why": "Writes the override sheet at each runtime's own path, loaded by @-include on Claude Code, pasted into AGENTS.md on Codex, and read directly by the Muse plugin hook since none has Cursor's always-applied rules, replaces Cursor's budget step with a default effort and per-role effort levels, adds the SessionStart hook toggle and names the Pi extension as a reader of it, lists every runtime's sheet path in a table, routes GitHub Copilot to copilot.md, and numbers its verification and formal verification offers as steps 9 and 10, and confirms provider-seat slugs through each provider's CLI and their levels against that provider's list.",
       "since": "0.9.2",
       "upstream": "not-proposed"
     },
@@ -288,6 +300,12 @@
       "kind": "policy",
       "why": "Adds a Report Format section requiring one summary report plus one detail file per subsystem or reviewer.",
       "since": "0.9.11",
+      "upstream": "not-proposed"
+    },
+    "plugins/pstack/skills/thermos/SKILL.md": {
+      "kind": "policy",
+      "why": "Runs both passes once per entry on a configurable thermos reviewers line, including provider seats, and weights findings that reviewers from different providers raised independently.",
+      "since": "0.9.97",
       "upstream": "not-proposed"
     }
   }

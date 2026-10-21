@@ -4,8 +4,9 @@
 # Muse SessionStart hook. POSIX awk, run under LC_ALL=C.
 
 # Fills roles[1..n] with the roles every sheet names, in sheet order, and
-# panel[role] for the panel lists, and SHEET_EFFORT[level] for the reasoning
-# effort levels. Returns n.
+# panel[role] for the panel lists, SHEET_EFFORT[level] for the reasoning
+# effort levels, SHEET_PROVIDER[provider] for the provider-seat prefixes, and
+# SHEET_PROVIDER_EFFORT[provider, level] for each provider's levels. Returns n.
 function sheet_roles(roles, panel,    n) {
   split("", roles)
   split("", panel)
@@ -28,6 +29,7 @@ function sheet_roles(roles, panel,    n) {
   roles[++n] = "swarm workers"
   roles[++n] = "architect runners"
   roles[++n] = "interrogate reviewers"
+  roles[++n] = "thermos reviewers"
   panel["arena runners"] = 1
   panel["arena cross-judge pool"] = 1
   panel["architect runners"] = 1
@@ -37,6 +39,28 @@ function sheet_roles(roles, panel,    n) {
   SHEET_EFFORT["high"] = 1
   SHEET_EFFORT["xhigh"] = 1
   SHEET_EFFORT["max"] = 1
+  SHEET_PROVIDER["claude"] = 1
+  SHEET_PROVIDER_EFFORT["claude", "low"] = 1
+  SHEET_PROVIDER_EFFORT["claude", "medium"] = 1
+  SHEET_PROVIDER_EFFORT["claude", "high"] = 1
+  SHEET_PROVIDER_EFFORT["claude", "xhigh"] = 1
+  SHEET_PROVIDER_EFFORT["claude", "max"] = 1
+  SHEET_PROVIDER["codex"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "minimal"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "low"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "medium"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "high"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "xhigh"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "max"] = 1
+  SHEET_PROVIDER_EFFORT["codex", "ultra"] = 1
+  SHEET_PROVIDER["grok"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "none"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "minimal"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "low"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "medium"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "high"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "xhigh"] = 1
+  SHEET_PROVIDER_EFFORT["grok", "max"] = 1
   return n
 }
 
@@ -66,13 +90,32 @@ function sheet_trim(s) {
   return s
 }
 
-# Drops a role value's reasoning effort suffix, as in `gpt-5.5 @xhigh`.
+# The provider of a seat entry written <provider>:<model>, or "" for any other
+# entry. Call sheet_roles first.
+function sheet_provider(e,    p) {
+  if (!match(e, /^[a-z]+:/)) return ""
+  p = substr(e, 1, RLENGTH - 1)
+  return (p in SHEET_PROVIDER) ? p : ""
+}
+
+# The model ID inside an entry: a seat's model after its provider prefix, or
+# the entry itself.
+function sheet_seat_model(e,    p) {
+  p = sheet_provider(e)
+  return p == "" ? e : substr(e, length(p) + 2)
+}
+
+# Drops a role value's reasoning effort suffix, as in `gpt-5.5 @xhigh` or
+# `grok:grok-4.7 @xhigh`. A seat entry takes its provider's levels.
 # Call sheet_roles first.
-function sheet_model(e,    level) {
+function sheet_model(e,    level, at, p) {
   if (match(e, /[ \t]+@[a-z]+$/)) {
-    level = substr(e, RSTART)
+    at = RSTART
+    level = substr(e, at)
     sub(/^[ \t]+@/, "", level)
-    if (level in SHEET_EFFORT) e = substr(e, 1, RSTART - 1)
+    p = sheet_provider(e)
+    if (p == "" && (level in SHEET_EFFORT)) e = substr(e, 1, at - 1)
+    else if (p != "" && ((p, level) in SHEET_PROVIDER_EFFORT)) e = substr(e, 1, at - 1)
   }
   return e
 }
@@ -81,7 +124,11 @@ function sheet_alias(id) {
   return id == "inherit-parent" || id == "auto"
 }
 
-function sheet_vendor(id) {
+# A seat's vendor is its provider; any other ID's vendor is its first
+# hyphen-separated word.
+function sheet_vendor(id,    p) {
+  p = sheet_provider(id)
+  if (p != "") return p
   sub(/-.*/, "", id)
   return id
 }
@@ -141,7 +188,7 @@ function sheet_problems(    roles, panel, n, want, any, i, key, out, E, m, j, e,
       e = sheet_model(sheet_trim(E[j]))
       if (e == "") { out = out "; an empty entry in `" key "`"; bad = 1; continue }
       if (sheet_alias(e)) { MODEL_ALIASES = 1; SHEET_MODELS[e] = 1; continue }
-      if (e !~ /^[a-z0-9][a-z0-9.-]*$/) { out = out "; `" key "` has an entry that is not a model ID"; bad = 1; continue }
+      if (sheet_seat_model(e) !~ /^[a-z0-9][a-z0-9.-]*$/) { out = out "; `" key "` has an entry that is not a model ID"; bad = 1; continue }
       if (!(e in SHEET_MODELS)) MODEL_LIST = MODEL_LIST (MODEL_LIST == "" ? "" : ", ") "`" e "`"
       SHEET_MODELS[e] = 1
       real = 1

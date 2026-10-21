@@ -54,6 +54,10 @@ Skills name Claude defaults (a single-role default for code/prose/judgment, a wo
 
 `/setup-pstack` writes the configured model list. On Codex, set it to your Codex model slugs.
 
+## Provider seats
+
+A panel, judge, or reviewer entry written `codex:<model>` runs as an ordinary `spawn_agent` child with that model and its level as `reasoning_effort`. Entries for other providers, such as `claude:` or `grok:`, run through the seat runner in [provider seats](provider-seats.md). Codex model rows live in `AGENTS.md`, so write seat entries there in the same `<provider>:<model>` form.
+
 ## Session routing hook
 
 The native pstack plugin bundles the same `SessionStart` routing instruction as the Claude Code plugin, through `session-start.sh` on macOS and Linux and `session-start.ps1` on Windows. Codex runs the hook on startup, resume, clear, and compact after the user trusts the hook through `/hooks`. The hook reads `session hook` from the Codex sheet, at the path in [setup-pstack's runtime table](../../setup-pstack/SKILL.md#other-runtimes); `session hook: off` disables injection.

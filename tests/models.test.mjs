@@ -186,3 +186,21 @@ describe("role labels reach the prose", () => {
     });
   }
 });
+
+describe("providers", () => {
+  const parse = (mutate) => {
+    const policy = structuredClone(raw);
+    mutate(policy);
+    return () => parseModels(policy, () => true);
+  };
+
+  test("the claude provider lists the Agent tool's effort levels", () => expect(raw.providers.claude).toEqual(raw.efforts));
+
+  test("a malformed providers block throws naming the provider", () => {
+    expect(parse((p) => delete p.providers)).toThrow('models.json: "providers" must be an object');
+    expect(parse((p) => (p.providers.grok = []))).toThrow('models.json: provider "grok" needs a non-empty list of levels');
+    expect(parse((p) => (p.providers.codex = ["ultra", "ultra"]))).toThrow('models.json: provider "codex" lists "ultra" twice');
+    expect(parse((p) => (p.providers["Grok"] = ["max"]))).toThrow('models.json: provider "Grok" must be lowercase letters');
+    expect(parse((p) => (p.providers.claude = ["low"]))).toThrow('models.json: provider "claude" must list the same levels as efforts');
+  });
+});

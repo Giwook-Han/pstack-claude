@@ -196,6 +196,19 @@ Playbooks use the runtime's task-tracking tools or an uncommitted `todo.md` chec
 
 Use [create-verification-skill](../plugins/pstack/skills/create-verification-skill/SKILL.md) to record how the agent should run and check your project, following the [driver policy](../plugins/pstack/skills/poteto-mode/SKILL.md#non-negotiables).
 
+### Provider seats
+
+A runtime's own subagent tool runs only that runtime's models, so a Claude Code or Codex panel draws every seat from one provider. A provider seat restores cross-provider diversity: an entry written `<provider>:<model>`, with an optional `@<level>`, runs on that provider's own CLI and subscription. The providers are `claude`, `codex`, and `grok`, and each takes its own reasoning levels, listed in [`models.json`](../plugins/pstack/models.json) under `providers`.
+
+```text
+architect runners: grok:grok-4.7 @xhigh, grok:grok-4.7 @xhigh, codex:gpt-6-astra @ultra, codex:gpt-6-astra @ultra, opus @max, opus @max
+arena cross-judge pool: codex:gpt-6.1-sol @ultra
+interrogate reviewers: grok:grok-4.7 @xhigh, opus @max
+thermos reviewers: grok:grok-4.7 @xhigh, opus @max
+```
+
+`arena`, `architect`, `interrogate`, and `thermos` take seats. An entry for the runtime you are on runs as an ordinary subagent. Every other seat runs through [`seat.mjs`](../plugins/pstack/skills/poteto-mode/scripts/seat.mjs), read-only, headless, and isolated from the machine's agent configuration, and writes its answer to a file. A failed seat is a dropout that the skill reports; it never reruns on another model. Each seat needs its CLI installed and signed in: Grok Build (`grok`), Codex (`codex`), or Claude Code (`claude`). The [provider seats reference](../plugins/pstack/skills/poteto-mode/references/provider-seats.md) covers the roles seats fit, the runner's command, and failure handling.
+
 ## Maintenance
 
 ### Repository layout

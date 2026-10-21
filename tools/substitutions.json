@@ -589,8 +589,8 @@
   ],
   "denylist": [
     {
-      "token": "grok-",
-      "hint": "Cursor model slug; point at the Models section, or add a substitution rule for the phrase"
+      "regex": "(?<!grok:)grok-",
+      "hint": "Cursor model slug; point at the Models section, or add a substitution rule for the phrase. A provider seat's grok:<model> entry is the port's own syntax and passes."
     },
     {
       "token": ".cursor-plugin",

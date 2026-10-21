@@ -367,6 +367,11 @@ export const lineStartingWith = (prefix) => (lines) => {
 
 const blankPadded = (body) => ["", ...body.split("\n"), ""];
 
+// Skills whose panel, judge, or reviewer roles take provider seats, and the
+// reference their stamped section links to (relative to the skills tree).
+export const PROVIDER_SEAT_SKILLS = ["arena", "architect", "interrogate", "thermos"];
+const SEATS_DOC = "poteto-mode/references/provider-seats.md";
+
 const SHEET_ROLES_OPEN = "  # Stamped from plugins/pstack/models.json; edit there and rerun tools/generate.mjs.";
 const ROLE_SKILLS_LINE = "Skills that dispatch on role models:";
 
@@ -381,6 +386,10 @@ function sheetRoles(models) {
     ...models.roles.map((r) => `  roles[++n] = ${quote(r.role)}`),
     ...models.roles.filter((r) => r.tier === "panel").map((r) => `  panel[${quote(r.role)}] = 1`),
     ...models.efforts.map((level) => `  SHEET_EFFORT[${quote(level)}] = 1`),
+    ...Object.entries(models.providers).flatMap(([provider, levels]) => [
+      `  SHEET_PROVIDER[${quote(provider)}] = 1`,
+      ...levels.map((level) => `  SHEET_PROVIDER_EFFORT[${quote(provider)}, ${quote(level)}] = 1`),
+    ]),
   ];
 }
 
@@ -424,6 +433,19 @@ export function regions(models) {
       appendHeading: "## Reasoning effort",
       render: () => blankPadded(effortSection(models.efforts, models.defaultEffort)),
     })),
+    ...PROVIDER_SEAT_SKILLS.map((skill) => ({
+      file: skillFile(skill),
+      name: "Provider seats section",
+      locate: section("Provider seats"),
+      appendHeading: "## Provider seats",
+      render: () => blankPadded(providerSeatsSection(models, `../${SEATS_DOC}`)),
+    })),
+    {
+      file: `${PLUGIN}/skills/${SEATS_DOC}`,
+      name: "provider levels",
+      locate: section("Levels"),
+      render: () => blankPadded(providerLevelsSection(models)),
+    },
     {
       file: skillFile("setup-pstack"),
       name: "Models section",
@@ -614,6 +636,16 @@ export function parseModels(raw, skillExists) {
   if (!raw.efforts.includes(raw.defaultEffort) && raw.defaultEffort !== "session") {
     fail(`defaultEffort "${raw.defaultEffort}" is not an effort level or "session"`);
   }
+  if (!isObject(raw.providers)) fail(`"providers" must be an object`);
+  for (const [provider, levels] of Object.entries(raw.providers)) {
+    if (!/^[a-z]+$/.test(provider)) fail(`provider "${provider}" must be lowercase letters`);
+    if (!Array.isArray(levels) || levels.length === 0) fail(`provider "${provider}" needs a non-empty list of levels`);
+    unique(levels, `provider "${provider}"`);
+    for (const level of levels) {
+      if (!/^[a-z]+$/.test(level)) fail(`provider "${provider}" level "${level}" must be lowercase letters`);
+    }
+  }
+  if (raw.providers.claude?.join() !== raw.efforts.join()) fail(`provider "claude" must list the same levels as efforts`);
   for (const runtime of RUNTIMES) runtime.checkModels?.(raw[runtime.key], { raw, fail, unique, isObject });
   return resolveModels(raw);
 }
@@ -696,6 +728,33 @@ export function effortSection(levels, defaultEffort) {
   );
 }
 
+const andList = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`);
+
+// A provider seat runs a role entry on another provider's CLI, so a panel can
+// mix model families across providers. `link` is the seats reference.
+export function providerSeatsSection(models, link) {
+  return (
+    "A role entry written `<provider>:<model>`, with an optional `@<level>`, is a provider seat: it runs on that provider's own CLI and subscription. " +
+    `The providers are ${andList(Object.keys(models.providers).map(code))}. [Provider seats](${link}) lists the levels each takes and the seat runner's command. ` +
+    "An entry for the runtime you are on, `claude:` on Claude Code or `codex:` on Codex, is an ordinary subagent with that model and level. " +
+    "Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, with the same prompt written to a self-contained file, and read its output file when it finishes. " +
+    "A seat reads files under its working directory but cannot edit them, run commands, or reach this session's MCP tools, so it returns text: a design, a review, or a verdict. " +
+    "A provider counts as its own model family. " +
+    "A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model."
+  );
+}
+
+export function providerLevelsSection(models) {
+  return (
+    "Stamped from `plugins/pstack/models.json` (edit there, rerun `tools/generate.mjs`). " +
+    "A model can accept fewer levels than its provider lists; the provider's CLI then fails the seat.\n\n" +
+    "| Provider | Levels |\n| --- | --- |\n" +
+    Object.entries(models.providers)
+      .map(([provider, levels]) => `| ${code(provider)} | ${codeList(levels)} |`)
+      .join("\n")
+  );
+}
+
 // Every agent file the plugin ships. Claude Code registers the agents/
 // directory by default, so plugin.json carries no "agents" list.
 export function pluginAgentPaths(pluginRoot) {
@@ -731,7 +790,10 @@ export function setupModelsSection(models) {
     `- Default panel: ${codeList(models.tiers.panel)}\n` +
     `- Reasoning effort levels: ${codeList(models.efforts)}\n` +
     `- Default reasoning effort: ${code(models.defaultEffort)}\n` +
-    `- Single-role default: ${code(models.tiers.default)}`
+    `- Single-role default: ${code(models.tiers.default)}\n` +
+    `- Provider seat levels: ${Object.entries(models.providers)
+      .map(([provider, levels]) => `${code(provider)} (${levels.join(", ")})`)
+      .join(", ")}`
   );
 }
 
@@ -748,6 +810,9 @@ export function overrideSheetBlock(models) {
     "A model may carry a reasoning effort, as in `opus @xhigh` (levels: " + models.efforts.join(", ") + "); " +
     "the role's subagent then runs at that level, each entry of a panel list on its own. " +
     "`default effort` sets the level for a value without one; `session` keeps the parent session's effort. " +
+    "An entry written `<provider>:<model>`, as in `grok:<model> @xhigh`, is a provider seat that runs on that provider's own CLI " +
+    "(providers: " + Object.keys(models.providers).join(", ") + "; each takes its own levels). Use seats on panel, judge, and reviewer lines. " +
+    "`panel vendors: any` lets a panel name models from one vendor, where a provider counts as a vendor. " +
     "`session hook: off` stops the Claude Code, Codex, or Muse SessionStart hook, or the pstack Pi extension, from injecting the poteto-mode mandate; " +
     "any other value, or no line, leaves it on.\n\n" +
     rows +

@@ -106,6 +106,8 @@ pstack routes tasks to `poteto-mode` automatically. At session start, a hook inj
 
 Run `setup-pstack` to turn automatic routing on or off, change model defaults, or set a reasoning effort per role (`arena runners: opus @xhigh, fable @max`).
 
+Panels can also mix providers. A `grok:<model>`, `codex:<model>`, or `claude:<model>` entry on a panel, judge, or reviewer line runs on that provider's own CLI and subscription, as in `interrogate reviewers: grok:grok-4.7 @xhigh, opus @max`. See [provider seats](docs/reference.md#provider-seats).
+
 ## Getting started
 
 ```text

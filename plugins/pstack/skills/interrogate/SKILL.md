@@ -29,7 +29,7 @@ Before spawning reviewers, state the intent in one clear paragraph from the user
 
 ## Step 3, Spawn Reviewers
 
-Launch all reviewers in a single message with the `Agent` tool, one per entry on the `interrogate reviewers` line in `pstack-models.md`, labeled Reviewer A, B, and so on to match the entry count. If the sheet or that line is missing, use the table defaults.
+Launch all reviewers in a single message with the `Agent` tool, one per entry on the `interrogate reviewers` line in `pstack-models.md`, labeled Reviewer A, B, and so on to match the entry count. If the sheet or that line is missing, use the table defaults. An entry with a provider prefix runs as a provider seat per [Provider seats](#provider-seats), with the same filled-in template as its prompt, launched in that same message.
 
 | Subagent | Default model |
 |----------|---------------|
@@ -83,3 +83,7 @@ You are the lead reviewer, a pragmatic senior engineer, not a neutral aggregator
 ## Reasoning effort
 
 A role value in the override sheet may name a reasoning effort after its model, as in `opus @xhigh`. Levels on Claude Code: `low`, `medium`, `high`, `xhigh`, `max`. Which ones apply depends on the model. A value without `@` takes the sheet's `default effort` line, a level or `session`, and `session` when the sheet has no such line. `session` sets no effort, so the dispatch is the usual one. Strip the suffix before reading the model: `inherit-parent` or `auto` still omits `model` at every level, and a model name is passed as `model`. Pass the level as the dispatch's effort field and keep the `subagent_type` you would otherwise use. That is `effort` on the Claude Code `Agent` call and `reasoning_effort` on Codex's `spawn_agent`. On Muse it is `effort` on a Workflow child; a `subagent_spawn` dispatch keeps the session's effort.
+
+## Provider seats
+
+A role entry written `<provider>:<model>`, with an optional `@<level>`, is a provider seat: it runs on that provider's own CLI and subscription. The providers are `claude`, `codex`, and `grok`. [Provider seats](../poteto-mode/references/provider-seats.md) lists the levels each takes and the seat runner's command. An entry for the runtime you are on, `claude:` on Claude Code or `codex:` on Codex, is an ordinary subagent with that model and level. Launch every other seat through the seat runner, in the background and in the same message as the subagent calls, with the same prompt written to a self-contained file, and read its output file when it finishes. A seat reads files under its working directory but cannot edit them, run commands, or reach this session's MCP tools, so it returns text: a design, a review, or a verdict. A provider counts as its own model family. A seat that fails is a dropout: continue with the rest, name the seat and its error in the output, and say that model diversity was reduced. Never rerun it on another model.

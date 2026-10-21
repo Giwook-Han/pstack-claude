@@ -64,6 +64,24 @@ describe("check-sheet.sh", () => {
     test(`rejects ${name}`, () => expect(check(text)).toEqual(invalid(problem)));
   }
 
+  test("passes provider seats at each provider's own levels", () => {
+    const seats = "grok:grok-4.7 @xhigh, grok:grok-4.7 @xhigh, codex:gpt-6-astra @ultra, claude:opus @max";
+    expect(check(sheet({ "architect runners": seats, "thermos reviewers": "grok:grok-4.7 @xhigh, claude:opus @max" }))).toEqual(ok);
+  });
+
+  test("rejects a seat level its provider does not list, and an unknown provider", () => {
+    const notAnId = invalid(`\`${roles[0]}\` has an entry that is not a model ID`);
+    expect(check(sheet({ [roles[0]]: "claude:opus @ultra" }))).toEqual(notAnId);
+    expect(check(sheet({ [roles[0]]: "codex:gpt-6-astra @none" }))).toEqual(notAnId);
+    expect(check(sheet({ [roles[0]]: "gemini:gemini-3.8-flash" }))).toEqual(notAnId);
+  });
+
+  test("counts a seat's provider as its vendor in a panel", () => {
+    const oneProvider = sheet({ "interrogate reviewers": "grok:grok-4.7 @xhigh, grok:grok-4.6" });
+    expect(check(oneProvider)).toEqual(invalid("`interrogate reviewers` has models from one vendor (grok)"));
+    expect(check(sheet({ "interrogate reviewers": "grok:grok-4.7 @xhigh, grok:grok-4.6" }, ["panel vendors: any"]))).toEqual(ok);
+  });
+
   test("reads the Copilot sheet when no path is given", () => {
     const copilotHome = join(home, "copilot-home");
     mkdirSync(copilotHome, { recursive: true });
